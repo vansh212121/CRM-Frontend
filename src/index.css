@@ -1,0 +1,254 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* NeuroFlow Clinical SaaS Design System
+   Typography: Inter (clean, professional)
+   Primary: Teal/Slate Blue (medical trust)
+   Accent: Lavender/Purple (brand sophistication)
+   Success: Clear green for confirmations
+*/
+
+@layer base {
+  :root {
+    --background: 220 20% 97%;
+    --foreground: 222 47% 11%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+
+    /* Primary: Refined Teal - trustworthy, calm, medical */
+    --primary: 190 70% 35%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Secondary: Soft lavender surface */
+    --secondary: 250 30% 96%;
+    --secondary-foreground: 250 25% 35%;
+
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 9% 46%;
+
+    /* Accent: Rich lavender purple */
+    --accent: 255 50% 58%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* Success: Fresh positive green */
+    --success: 160 72% 38%;
+    --success-foreground: 0 0% 100%;
+
+    /* Warning */
+    --warning: 43 96% 56%;
+    --warning-foreground: 0 0% 0%;
+
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 190 70% 35%;
+
+    --radius: 0.625rem;
+
+    /* Sidebar: Clean lavender-tinted */
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 222 47% 20%;
+    --sidebar-primary: 255 50% 55%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 250 30% 96%;
+    --sidebar-accent-foreground: 250 25% 25%;
+    --sidebar-border: 220 13% 93%;
+    --sidebar-ring: 190 70% 35%;
+
+    /* Chart colors */
+    --chart-1: 190 70% 35%;
+    --chart-2: 255 50% 58%;
+    --chart-3: 160 72% 38%;
+    --chart-4: 43 96% 56%;
+    --chart-5: 0 84% 60%;
+  }
+
+  .dark {
+    --background: 224 71% 4%;
+    --foreground: 213 31% 91%;
+
+    --card: 224 71% 7%;
+    --card-foreground: 213 31% 91%;
+
+    --popover: 224 71% 7%;
+    --popover-foreground: 213 31% 91%;
+
+    --primary: 190 65% 45%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 255 20% 15%;
+    --secondary-foreground: 255 25% 85%;
+
+    --muted: 223 47% 11%;
+    --muted-foreground: 215 16% 57%;
+
+    --accent: 255 45% 55%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 63% 45%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 160 65% 40%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 43 90% 50%;
+    --warning-foreground: 0 0% 0%;
+
+    --border: 216 34% 17%;
+    --input: 216 34% 17%;
+    --ring: 190 65% 45%;
+
+    --sidebar-background: 224 71% 6%;
+    --sidebar-foreground: 213 31% 85%;
+    --sidebar-primary: 255 45% 60%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 255 20% 15%;
+    --sidebar-accent-foreground: 255 20% 85%;
+    --sidebar-border: 216 34% 15%;
+    --sidebar-ring: 190 65% 45%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  /* Typography refinement */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-display tracking-tight;
+  }
+
+  h1 {
+    @apply text-3xl font-semibold leading-tight;
+  }
+
+  h2 {
+    @apply text-2xl font-semibold leading-snug;
+  }
+
+  h3 {
+    @apply text-xl font-medium;
+  }
+
+  p {
+    @apply leading-relaxed;
+  }
+}
+
+@layer components {
+  /* Card variants */
+  .card-elevated {
+    @apply bg-card border border-border rounded-xl;
+    box-shadow: 0 0 0 1px hsl(var(--border) / 0.5),
+      0 1px 2px hsl(var(--foreground) / 0.03),
+      0 4px 16px -2px hsl(var(--foreground) / 0.04);
+  }
+
+  .card-subtle {
+    @apply bg-card/50 backdrop-blur-sm border border-border/50 rounded-xl;
+  }
+
+  /* Page section styling */
+  .page-section {
+    @apply bg-card rounded-2xl border border-border p-6;
+    box-shadow: 0 0 0 1px hsl(var(--border) / 0.3),
+      0 2px 8px -2px hsl(var(--foreground) / 0.03),
+      0 8px 24px -4px hsl(var(--foreground) / 0.04);
+  }
+
+  /* Refined table styling */
+  .table-container {
+    @apply rounded-xl border border-border bg-card overflow-hidden;
+    box-shadow: 0 1px 3px hsl(var(--foreground) / 0.02);
+  }
+
+  /* Status badges */
+  .status-active {
+    @apply bg-success/10 text-success border border-success/20;
+  }
+
+  .status-pending {
+    @apply bg-warning/10 text-warning border border-warning/20;
+  }
+
+  .status-cancelled {
+    @apply bg-destructive/10 text-destructive border border-destructive/20;
+  }
+
+  /* Stat cards */
+  .stat-card {
+    @apply bg-card rounded-xl border border-border p-4 transition-all duration-200;
+    box-shadow: 0 1px 2px hsl(var(--foreground) / 0.02);
+  }
+
+  .stat-card:hover {
+    box-shadow: 0 0 0 1px hsl(var(--border)),
+      0 4px 12px -2px hsl(var(--foreground) / 0.06);
+  }
+
+  /* Tab styling */
+  .tabs-refined [role="tablist"] {
+    @apply bg-muted/50 p-1 rounded-lg border border-border/50;
+  }
+
+  .tabs-refined [role="tab"] {
+    @apply rounded-md px-4 py-2 text-sm font-medium transition-all;
+  }
+
+  .tabs-refined [role="tab"][data-state="active"] {
+    @apply bg-card shadow-sm;
+  }
+
+  /* Search input */
+  .search-input {
+    @apply bg-muted/50 border-0 focus:bg-card focus:ring-1 focus:ring-ring/20 transition-all;
+  }
+}
+
+@layer utilities {
+  .hover-lift {
+    @apply transition-all duration-200 ease-out;
+  }
+
+  .hover-lift:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px -2px hsl(var(--foreground) / 0.08);
+  }
+
+  /* Text utilities */
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  /* Gradient backgrounds */
+  .gradient-subtle {
+    background: linear-gradient(
+      180deg,
+      hsl(var(--background)) 0%,
+      hsl(var(--muted) / 0.5) 100%
+    );
+  }
+
+  /* Divider */
+  .divider-subtle {
+    @apply border-t border-border/60;
+  }
+}
