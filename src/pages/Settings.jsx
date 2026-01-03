@@ -1,82 +1,188 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { 
-  User, 
-  Shield, 
-  Lock, 
-  LogOut, 
-  Trash2, 
-  Mail, 
-  Phone, 
-  Eye, 
+import {
+  User,
+  Shield,
+  Lock,
+  LogOut,
+  Trash2,
+  Mail,
+  Eye,
   EyeOff,
   Save,
-  X,
-  AlertTriangle
+  AlertTriangle,
+  Loader2,
 } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
+import {
+  useChangeMyPasswordMutation,
+  useDeleteMyAccountMutation,
+  useGetMeQuery,
+  useUpdateMyAccountMutation,
+} from "@/features/api/userApi";
+import { handleError } from "@/lib/handleError";
+import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { useLogoutMutation } from "@/features/api/authApi";
+import { selectRefreshToken } from "@/features/authSlice";
+import { useSelector } from "react-redux";
+import { useNavigate } from "react-router-dom";
 
 export default function Settings() {
   const [activeSection, setActiveSection] = useState("profile");
+  const { data: currentUser, isLoading: isLoadingUser } = useGetMeQuery();
+  // Profile state
+  const [profileData, setProfileData] = useState({
+    name: "",
+    email: "",
+  });
+
+  // Password state
+  const [passwordData, setPasswordData] = useState({
+    current_password: "",
+    new_password: "",
+    confirm_password: "",
+  });
   const [showPassword, setShowPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  // Profile state
-  const [profile, setProfile] = useState({
-    name: "Dr. Sarah Chen",
-    email: "sarah.chen@neuroflow.com",
-    phone: "+1 (555) 123-4567",
-    role: "Administrator",
-    department: "Neurology",
-    notifications: true,
-    twoFactor: false
-  });
-
-  // Password state
-  const [passwords, setPasswords] = useState({
-    current: "",
-    new: "",
-    confirm: ""
-  });
-
   // Delete account state
-  const [deleteConfirmation, setDeleteConfirmation] = useState("");
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
 
-  const handleProfileUpdate = () => {
-    console.log("Updating profile:", profile);
-    // API call would go here
+  // Logout
+  const refreshToken = useSelector(selectRefreshToken);
+  const [logout, { isLoading: isLoggingOut }] = useLogoutMutation();
+  const navigate = useNavigate();
+
+  // APIS
+  const [updateMyProfile, { isLoading: isUpdatingProfile }] =
+    useUpdateMyAccountMutation();
+  const [changeMyPassword, { isLoading: isChangingPassword }] =
+    useChangeMyPasswordMutation();
+  const [deleteMyAccount, { isLoading: isDeleting }] =
+    useDeleteMyAccountMutation();
+
+  // Populate data
+  useEffect(() => {
+    if (currentUser) {
+      setProfileData({
+        name: currentUser.name || "",
+        email: currentUser.email || "",
+      });
+    }
+  }, [currentUser]);
+
+  // --- Handlers ---
+  const handleProfileInputChange = (e) => {
+    setProfileData({ ...profileData, [e.target.id]: e.target.value });
   };
 
-  const handlePasswordUpdate = () => {
-    if (passwords.new !== passwords.confirm) {
-      alert("New passwords do not match!");
+  const handlePasswordInputChange = (e) => {
+    setPasswordData({ ...passwordData, [e.target.id]: e.target.value });
+  };
+
+  // Submit Methods
+  const handleProfileSubmit = async (e) => {
+    e.preventDefault();
+    const changedData = Object.keys(profileData).reduce((acc, key) => {
+      if (profileData[key] !== currentUser[key]) acc[key] = profileData[key];
+      return acc;
+    }, {});
+
+    if (Object.keys(changedData).length === 0) {
+      toast.info("No profile changes to save.");
       return;
     }
-    console.log("Updating password");
-    // API call would go here
-  };
 
-  const handleDeleteAccount = () => {
-    if (deleteConfirmation !== "DELETE") {
-      alert("Please type DELETE to confirm account deletion");
+    toast.promise(updateMyProfile(changedData).unwrap(), {
+      loading: "Updating your profile...",
+      success: "Profile updated successfully!",
+      error: (err) => handleError(err, "Failed to update profile."),
+    });
+  };
+  const handlePasswordSubmit = async (e) => {
+    e.preventDefault();
+    if (passwordData.new_password !== passwordData.confirm_password) {
+      toast.error("New passwords do not match.");
       return;
     }
-    console.log("Deleting account");
-    // API call would go here
-  };
+    const promise = changeMyPassword({
+      current_password: passwordData.current_password,
+      new_password: passwordData.new_password,
+    }).unwrap();
 
+    toast.promise(promise, {
+      loading: "Changing your password...",
+      success: () => {
+        setPasswordData({
+          current_password: "",
+          new_password: "",
+          confirm_password: "",
+        });
+        return "Password changed successfully! You are being logged out for security.";
+      },
+      error: (err) => handleError(err, "Failed to change password."),
+    });
+  };
+  const handleDeleteAccount = async () => {
+    try {
+      await deleteMyAccount().unwrap();
+      toast.success("Account deleted successfully!");
+      setShowDeleteDialog(false);
+    } catch (err) {
+      console.error("Deactivation failed:", err);
+      toast.error("Failed to delete account. Logging out locally.");
+      setShowDeleteDialog(false);
+    }
+  };
   const handleLogout = () => {
-    console.log("Logging out");
-    // Logout logic here
+    if (refreshToken) {
+      const promise = logout({ refresh_token: refreshToken }).unwrap();
+
+      toast.promise(promise, {
+        loading: "Signing out...",
+        success: () => {
+          navigate("/login");
+          return "You have been signed out successfully!";
+        },
+        error: () => {
+          navigate("/login");
+          return "Logout failed on the server, but you are now signed out.";
+        },
+      });
+    }
   };
+
+  // --- Loading State ---
+  if (isLoadingUser) {
+    return (
+      <div className="p-8 flex justify-center items-center h-screen">
+        <Loader2 className="w-8 h-8 animate-spin text-primary-500" />
+      </div>
+    );
+  }
 
   return (
     <DashboardLayout>
@@ -113,7 +219,9 @@ export default function Settings() {
           >
             <Card className="border-border/40">
               <CardHeader>
-                <CardTitle className="text-lg font-semibold">Settings</CardTitle>
+                <CardTitle className="text-lg font-semibold">
+                  Settings
+                </CardTitle>
                 <CardDescription className="text-sm">
                   Manage your account preferences
                 </CardDescription>
@@ -160,13 +268,9 @@ export default function Settings() {
               <CardContent className="p-4">
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Role</span>
-                    <Badge variant="outline" className="text-xs border-accent/30 text-accent bg-accent/10">
-                      {profile.role}
-                    </Badge>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Status</span>
+                    <span className="text-sm text-muted-foreground">
+                      Status
+                    </span>
                     <div className="flex items-center gap-2">
                       <div className="h-2 w-2 rounded-full bg-success animate-pulse" />
                       <span className="text-xs text-success">Active</span>
@@ -177,10 +281,11 @@ export default function Settings() {
                     <Button
                       variant="outline"
                       onClick={handleLogout}
-                      className="w-full h-9 rounded-lg border-border/40 hover:border-accent/30 hover:bg-accent/5 gap-2"
+                      disabled={isLoggingOut}
+                      className="w-full h-9 rounded-lg border-border/40 hover:border-accent/30 hover:bg-accent/60 hover:text-white gap-2"
                     >
                       <LogOut className="h-4 w-4" />
-                      Sign Out
+                      {isLoggingOut ? "Logging out..." : "Logout"}
                     </Button>
                   </div>
                 </div>
@@ -208,97 +313,54 @@ export default function Settings() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-5">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="name" className="text-sm font-medium">
-                        Full Name
-                      </Label>
-                      <Input
-                        id="name"
-                        value={profile.name}
-                        onChange={(e) => setProfile({...profile, name: e.target.value})}
-                        className="h-10 rounded-lg border-border/40"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="email" className="text-sm font-medium flex items-center gap-1.5">
-                        <Mail className="h-3.5 w-3.5 text-accent/70" />
-                        Email Address
-                      </Label>
-                      <Input
-                        id="email"
-                        type="email"
-                        value={profile.email}
-                        onChange={(e) => setProfile({...profile, email: e.target.value})}
-                        className="h-10 rounded-lg border-border/40"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="phone" className="text-sm font-medium flex items-center gap-1.5">
-                        <Phone className="h-3.5 w-3.5 text-accent/70" />
-                        Phone Number
-                      </Label>
-                      <Input
-                        id="phone"
-                        value={profile.phone}
-                        onChange={(e) => setProfile({...profile, phone: e.target.value})}
-                        className="h-10 rounded-lg border-border/40"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="department" className="text-sm font-medium">
-                        Department
-                      </Label>
-                      <Input
-                        id="department"
-                        value={profile.department}
-                        onChange={(e) => setProfile({...profile, department: e.target.value})}
-                        className="h-10 rounded-lg border-border/40"
-                      />
-                    </div>
-                  </div>
-
-                  <Separator />
-
-                  <div className="space-y-4">
-                    <h3 className="text-sm font-semibold text-foreground">Preferences</h3>
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <div className="space-y-0.5">
-                          <Label className="text-sm font-medium">Email Notifications</Label>
-                          <p className="text-xs text-muted-foreground/80">
-                            Receive updates about appointments and system alerts
-                          </p>
-                        </div>
-                        <Switch
-                          checked={profile.notifications}
-                          onCheckedChange={(checked) => setProfile({...profile, notifications: checked})}
+                  <form onSubmit={handleProfileSubmit}>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="name" className="text-sm font-medium">
+                          Full Name
+                        </Label>
+                        <Input
+                          id="name"
+                          value={profileData.name}
+                          onChange={handleProfileInputChange}
+                          className="h-10 rounded-lg border-border/40"
                         />
                       </div>
-                      <div className="flex items-center justify-between">
-                        <div className="space-y-0.5">
-                          <Label className="text-sm font-medium">Two-Factor Authentication</Label>
-                          <p className="text-xs text-muted-foreground/80">
-                            Add an extra layer of security to your account
-                          </p>
-                        </div>
-                        <Switch
-                          checked={profile.twoFactor}
-                          onCheckedChange={(checked) => setProfile({...profile, twoFactor: checked})}
+
+                      <div className="space-y-2">
+                        <Label
+                          htmlFor="email"
+                          className="text-sm font-medium flex items-center gap-1.5"
+                        >
+                          <Mail className="h-3.5 w-3.5 text-accent/70" />
+                          Email Address
+                        </Label>
+                        <Input
+                          id="email"
+                          type="email"
+                          value={profileData.email}
+                          onChange={handleProfileInputChange}
+                          className="h-10 rounded-lg border-border/40"
                         />
                       </div>
                     </div>
-                  </div>
 
-                  <div className="flex justify-end">
-                    <Button
-                      onClick={handleProfileUpdate}
-                      className="h-10 rounded-lg bg-accent hover:bg-accent/90 gap-2"
-                    >
-                      <Save className="h-4 w-4" />
-                      Save Changes
-                    </Button>
-                  </div>
+                    <div className="flex justify-end mt-4">
+                      <Button
+                        type="submit"
+                        disabled={isUpdatingProfile}
+                        className="h-10 rounded-lg bg-accent hover:bg-accent/90 gap-2"
+                      >
+                        {isUpdatingProfile ? (
+                          "Saving..."
+                        ) : (
+                          <div className="flex gap-2">
+                            <Save className="h-4 w-4" /> Save Changes
+                          </div>
+                        )}
+                      </Button>
+                    </div>
+                  </form>
                 </CardContent>
               </Card>
             )}
@@ -316,177 +378,185 @@ export default function Settings() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-5">
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="currentPassword" className="text-sm font-medium">
-                        Current Password
-                      </Label>
-                      <div className="relative">
-                        <Input
-                          id="currentPassword"
-                          type={showPassword ? "text" : "password"}
-                          value={passwords.current}
-                          onChange={(e) => setPasswords({...passwords, current: e.target.value})}
-                          className="h-10 rounded-lg border-border/40 pr-10"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-accent"
+                  <form onSubmit={handlePasswordSubmit}>
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label
+                          htmlFor="currentPassword"
+                          className="text-sm font-medium"
                         >
-                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="newPassword" className="text-sm font-medium">
-                          New Password
+                          Current Password
                         </Label>
                         <div className="relative">
                           <Input
-                            id="newPassword"
-                            type={showNewPassword ? "text" : "password"}
-                            value={passwords.new}
-                            onChange={(e) => setPasswords({...passwords, new: e.target.value})}
+                            id="current_password"
+                            type={showPassword ? "text" : "password"}
+                            placeholder="Enter current password"
+                            value={passwordData.current_password}
+                            onChange={handlePasswordInputChange}
+                            required
                             className="h-10 rounded-lg border-border/40 pr-10"
                           />
                           <button
                             type="button"
-                            onClick={() => setShowNewPassword(!showNewPassword)}
+                            onClick={() => setShowPassword(!showPassword)}
                             className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-accent"
                           >
-                            {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            {showPassword ? (
+                              <EyeOff className="h-4 w-4" />
+                            ) : (
+                              <Eye className="h-4 w-4" />
+                            )}
                           </button>
                         </div>
                       </div>
 
-                      <div className="space-y-2">
-                        <Label htmlFor="confirmPassword" className="text-sm font-medium">
-                          Confirm New Password
-                        </Label>
-                        <div className="relative">
-                          <Input
-                            id="confirmPassword"
-                            type={showConfirmPassword ? "text" : "password"}
-                            value={passwords.confirm}
-                            onChange={(e) => setPasswords({...passwords, confirm: e.target.value})}
-                            className="h-10 rounded-lg border-border/40 pr-10"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-accent"
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label
+                            htmlFor="new_password"
+                            className="text-sm font-medium"
                           >
-                            {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                          </button>
+                            New Password
+                          </Label>
+                          <div className="relative">
+                            <Input
+                              id="new_password"
+                              type={showNewPassword ? "text" : "password"}
+                              value={passwordData.new_password}
+                              onChange={handlePasswordInputChange}
+                              placeholder="Enter new password"
+                              required
+                              className="h-10 rounded-lg border-border/40 pr-10"
+                            />
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setShowNewPassword(!showNewPassword)
+                              }
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-accent"
+                            >
+                              {showNewPassword ? (
+                                <EyeOff className="h-4 w-4" />
+                              ) : (
+                                <Eye className="h-4 w-4" />
+                              )}
+                            </button>
+                          </div>
                         </div>
+
+                        <div className="space-y-2">
+                          <Label
+                            htmlFor="confirm_password"
+                            className="text-sm font-medium"
+                          >
+                            Confirm New Password
+                          </Label>
+                          <div className="relative">
+                            <Input
+                              id="confirm_password"
+                              type={showConfirmPassword ? "text" : "password"}
+                              value={passwordData.confirm_password}
+                              onChange={handlePasswordInputChange}
+                              placeholder="Confirm new password"
+                              required
+                              className="h-10 rounded-lg border-border/40 pr-10"
+                            />
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setShowConfirmPassword(!showConfirmPassword)
+                              }
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-accent"
+                            >
+                              {showConfirmPassword ? (
+                                <EyeOff className="h-4 w-4" />
+                              ) : (
+                                <Eye className="h-4 w-4" />
+                              )}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="rounded-lg border border-border/30 bg-muted/20 p-4">
+                        <p className="text-sm font-medium text-foreground mb-2">
+                          Password Requirements
+                        </p>
+                        <ul className="space-y-1 text-xs text-muted-foreground/80">
+                          <li className="flex items-start gap-2">
+                            <div className="h-1.5 w-1.5 rounded-full bg-accent mt-1" />
+                            Minimum 8 characters
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <div className="h-1.5 w-1.5 rounded-full bg-accent mt-1" />
+                            At least one uppercase letter
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <div className="h-1.5 w-1.5 rounded-full bg-accent mt-1" />
+                            At least one number
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <div className="h-1.5 w-1.5 rounded-full bg-accent mt-1" />
+                            At least one special character
+                          </li>
+                        </ul>
                       </div>
                     </div>
 
-                    <div className="rounded-lg border border-border/30 bg-muted/20 p-4">
-                      <p className="text-sm font-medium text-foreground mb-2">Password Requirements</p>
-                      <ul className="space-y-1 text-xs text-muted-foreground/80">
-                        <li className="flex items-start gap-2">
-                          <div className="h-1.5 w-1.5 rounded-full bg-accent mt-1" />
-                          Minimum 8 characters
-                        </li>
-                        <li className="flex items-start gap-2">
-                          <div className="h-1.5 w-1.5 rounded-full bg-accent mt-1" />
-                          At least one uppercase letter
-                        </li>
-                        <li className="flex items-start gap-2">
-                          <div className="h-1.5 w-1.5 rounded-full bg-accent mt-1" />
-                          At least one number
-                        </li>
-                        <li className="flex items-start gap-2">
-                          <div className="h-1.5 w-1.5 rounded-full bg-accent mt-1" />
-                          At least one special character
-                        </li>
-                      </ul>
+                    <div className="flex justify-end">
+                      <Button
+                        type="submit"
+                        disabled={isChangingPassword}
+                        className="h-10 rounded-lg bg-accent hover:bg-accent/90 gap-2"
+                      >
+                        {isChangingPassword ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Changing...
+                          </>
+                        ) : (
+                          <>
+                            <Save className="w-4 h-4 mr-2" />
+                            Change Password
+                          </>
+                        )}
+                      </Button>
                     </div>
-                  </div>
-
-                  <div className="flex justify-end">
-                    <Button
-                      onClick={handlePasswordUpdate}
-                      className="h-10 rounded-lg bg-accent hover:bg-accent/90 gap-2"
-                    >
-                      <Lock className="h-4 w-4" />
-                      Update Password
-                    </Button>
-                  </div>
+                  </form>
                 </CardContent>
               </Card>
             )}
 
             {/* Danger Zone Section */}
             {activeSection === "danger" && (
-              <Card className="border-border/40">
+              <Card className="border-destructive">
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-lg font-semibold text-destructive">
-                    <AlertTriangle className="h-5 w-5 text-destructive" />
+                  <CardTitle className="text-destructive flex items-center gap-2">
+                    <AlertTriangle className="w-5 h-5" />
                     Danger Zone
                   </CardTitle>
-                  <CardDescription className="text-sm">
-                    Irreversible actions that affect your account
+                  <CardDescription>
+                    Irreversible and destructive actions
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-6">
-                  {/* Delete Account */}
-                  <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-5">
-                    <div className="flex items-start gap-3">
-                      <Trash2 className="h-5 w-5 text-destructive mt-0.5" />
-                      <div className="flex-1">
-                        <h3 className="text-sm font-semibold text-foreground mb-2">Delete Account</h3>
-                        <p className="text-sm text-muted-foreground/80 mb-4">
-                          Once you delete your account, there is no going back. All your data will be permanently removed.
-                        </p>
-                        
-                        <div className="space-y-3">
-                          <div className="space-y-2">
-                            <Label className="text-sm font-medium">
-                              Type <span className="font-mono text-destructive">DELETE</span> to confirm
-                            </Label>
-                            <Input
-                              value={deleteConfirmation}
-                              onChange={(e) => setDeleteConfirmation(e.target.value)}
-                              placeholder="Type DELETE here"
-                              className="h-10 rounded-lg border-destructive/40 focus:border-destructive/50"
-                            />
-                          </div>
-                          <Button
-                            onClick={handleDeleteAccount}
-                            disabled={deleteConfirmation !== "DELETE"}
-                            className="h-10 rounded-lg bg-gradient-to-r from-destructive to-destructive/90 hover:from-destructive/90 hover:to-destructive/80 gap-2"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                            Delete Account
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Logout Everywhere */}
-                  <div className="rounded-lg border border-border/30 p-5">
-                    <div className="flex items-start gap-3">
-                      <LogOut className="h-5 w-5 text-accent mt-0.5" />
-                      <div className="flex-1">
-                        <h3 className="text-sm font-semibold text-foreground mb-2">Logout from All Devices</h3>
-                        <p className="text-sm text-muted-foreground/80 mb-4">
-                          This will log you out from all devices and invalidate all active sessions.
-                        </p>
-                        <Button
-                          variant="outline"
-                          onClick={handleLogout}
-                          className="h-10 rounded-lg border-border/40 hover:border-accent/30 hover:bg-accent/5 gap-2"
-                        >
-                          <LogOut className="h-4 w-4" />
-                          Logout Everywhere
-                        </Button>
-                      </div>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div>
+                      <h3 className="font-medium text-foreground mb-2">
+                        Delete Account
+                      </h3>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Once you delete your account, there is no going back.
+                        All your data will be permanently removed. Please be
+                        certain.
+                      </p>
+                      <Button
+                        variant="destructive"
+                        onClick={() => setShowDeleteDialog(true)}
+                      >
+                        Delete Account
+                      </Button>
                     </div>
                   </div>
                 </CardContent>
@@ -494,6 +564,46 @@ export default function Settings() {
             )}
           </motion.div>
         </div>
+
+        {/* Delete Account Dialog */}
+        <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-destructive">
+                Are you absolutely sure?
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                This action cannot be undone. This will permanently delete your
+                account and remove all of your data from our servers.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="my-4">
+              <Label htmlFor="delete-confirm" className="text-sm">
+                Type <span className="font-mono font-bold">DELETE</span> to
+                confirm
+              </Label>
+              <Input
+                id="delete-confirm"
+                value={deleteConfirmText}
+                onChange={(e) => setDeleteConfirmText(e.target.value)}
+                placeholder="DELETE"
+                className="mt-2 focus-ring"
+              />
+            </div>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isDeleting}>
+                Cancel
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDeleteAccount}
+                disabled={deleteConfirmText !== "DELETE" || isDeleting}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {isDeleting ? "Deleting..." : "Delete Account"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </DashboardLayout>
   );

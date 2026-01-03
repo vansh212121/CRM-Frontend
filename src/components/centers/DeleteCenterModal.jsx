@@ -2,7 +2,6 @@ import { AlertTriangle, X, Trash2, Shield } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogContent,
-  AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogDescription,
   AlertDialogFooter,
