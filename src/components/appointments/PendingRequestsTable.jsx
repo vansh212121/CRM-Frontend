@@ -303,7 +303,7 @@ export function PendingRequestsTable({
         </div>
 
         <div className="relative">
-          <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-accent/30 via-purple-300/20 to-transparent" />
+          {/* <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-accent/30 via-purple-300/20 to-transparent" /> */}
           
           <Table>
             <TableHeader>

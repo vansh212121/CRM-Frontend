@@ -1,4 +1,5 @@
-import { AlertTriangle, X, Trash2, Shield } from "lucide-react";
+import { useState, useEffect } from "react";
+import { AlertTriangle, X, Trash2, Building2 } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -6,28 +7,44 @@ import {
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogCancel,
-  AlertDialogAction,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
-export function DeleteCenterDialog({ center, open, onOpenChange, onConfirm }) {
+export function DeleteCenterDialog({
+  center,
+  open,
+  onOpenChange,
+  onConfirm,
+  isLoading,
+}) {
+  const [confirmText, setConfirmText] = useState("");
+
+  // Reset input when modal opens/closes
+  useEffect(() => {
+    if (open) setConfirmText("");
+  }, [open]);
+
+  const isConfirmed = confirmText === "DELETE";
+
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent className="p-0 overflow-hidden">
-        <div className="rounded-xl border border-border/50 bg-card shadow-sm">
+      <AlertDialogContent className="p-0 overflow-hidden sm:max-w-[440px] gap-0">
+        <div className="flex flex-col bg-card">
           {/* Header */}
-          <div className="border-b border-destructive/20 bg-destructive/5 px-6 py-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="rounded-lg bg-destructive/10 p-2 border border-destructive/20">
-                  <AlertTriangle className="h-5 w-5 text-destructive" />
+          <div className="p-6 pb-0">
+            <div className="flex items-start justify-between">
+              <div className="flex gap-4">
+                <div className="rounded-full bg-destructive/10 p-3 h-12 w-12 flex items-center justify-center shrink-0 border border-destructive/20">
+                  <AlertTriangle className="h-6 w-6 text-destructive" />
                 </div>
-                <div>
+                <div className="space-y-1">
                   <AlertDialogTitle className="text-lg font-semibold text-foreground">
-                    Delete Center
+                    Delete Center?
                   </AlertDialogTitle>
-                  <AlertDialogDescription className="text-sm text-muted-foreground/80 mt-0.5">
-                    Confirm permanent deletion
+                  <AlertDialogDescription className="text-muted-foreground text-sm">
+                    This action cannot be undone. This will permanently delete
+                    the center and remove its data from our servers.
                   </AlertDialogDescription>
                 </div>
               </div>
@@ -35,112 +52,70 @@ export function DeleteCenterDialog({ center, open, onOpenChange, onConfirm }) {
                 size="icon"
                 variant="ghost"
                 onClick={() => onOpenChange(false)}
-                className="h-8 w-8 rounded-lg hover:bg-destructive/10"
+                className="h-8 w-8 -mt-2 -mr-2 text-muted-foreground hover:text-foreground"
               >
                 <X className="h-4 w-4" />
               </Button>
             </div>
           </div>
 
-          {/* Warning Content */}
-          <div className="px-6 py-5">
-            <div className="space-y-5">
-              {/* Center Info Card */}
-              <div className="rounded-lg border border-border/30 p-4">
-                <div className="flex items-center gap-3">
-                  <div className="rounded-lg bg-accent/10 p-2 border border-accent/20">
-                    <Shield className="h-4 w-4 text-accent" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-foreground">
-                      {center?.name}
-                    </p>
-                    <div className="flex items-center gap-3 mt-1.5">
-                      <span className="text-xs text-muted-foreground/80">
-                        {center?.district}
-                      </span>
-                      <span className="text-xs text-muted-foreground/80">
-                        ID: {center?.id}
-                      </span>
-                    </div>
-                  </div>
+          {/* Center Preview Card */}
+          <div className="px-6 py-6">
+            <div className="rounded-lg border border-border/60 bg-muted/30 p-4 mb-6">
+              <div className="flex items-center gap-3">
+                <div className="rounded-md bg-background p-2 border border-border/40 shadow-sm">
+                  <Building2 className="h-5 w-5 text-muted-foreground" />
                 </div>
-              </div>
-
-              {/* Warning Message */}
-              <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-4">
-                <div className="flex items-start gap-3">
-                  <AlertTriangle className="h-4 w-4 text-destructive mt-0.5" />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-foreground mb-2">
-                      This action is permanent and cannot be undone
-                    </p>
-                    <ul className="space-y-1.5 text-sm text-muted-foreground/80">
-                      <li className="flex items-start gap-2">
-                        <div className="h-1.5 w-1.5 rounded-full bg-destructive/60 mt-1.5" />
-                        All center data will be permanently deleted
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <div className="h-1.5 w-1.5 rounded-full bg-destructive/60 mt-1.5" />
-                        Associated appointments may be affected
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <div className="h-1.5 w-1.5 rounded-full bg-destructive/60 mt-1.5" />
-                        Patients assigned to this center will need reassignment
-                      </li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
-
-              {/* Confirmation Prompt */}
-              <div className="rounded-lg border border-border/30 bg-muted/20 p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="h-1.5 w-1.5 rounded-full bg-destructive" />
-                  <p className="text-sm font-medium text-foreground">
-                    Please confirm deletion
+                <div>
+                  <p className="text-sm font-semibold text-foreground">
+                    {center?.name}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {center?.district || "No district specified"}
                   </p>
                 </div>
-                <p className="text-sm text-muted-foreground/80">
-                  Type{" "}
-                  <span className="font-mono text-destructive font-semibold">
-                    DELETE
-                  </span>{" "}
-                  to confirm
-                </p>
-                <div className="mt-3">
-                  <input
-                    type="text"
-                    placeholder="Type DELETE here"
-                    className="w-full h-10 rounded-lg border border-border/40 focus:border-destructive/50 focus:ring-destructive/20 px-3 text-sm transition-all"
-                    id="confirmation-input"
-                  />
-                </div>
               </div>
+            </div>
+
+            {/* Confirmation Input */}
+            <div className="space-y-3">
+              <label className="text-sm font-medium text-foreground">
+                Type <span className="font-bold text-destructive">DELETE</span>{" "}
+                to confirm
+              </label>
+              <Input
+                value={confirmText}
+                onChange={(e) => setConfirmText(e.target.value)}
+                placeholder="DELETE"
+                className="font-mono placeholder:font-sans"
+              />
             </div>
           </div>
 
           {/* Footer */}
-          <div className="border-t border-border/30 px-6 py-4">
-            <AlertDialogFooter className="flex items-center justify-between">
-              <AlertDialogCancel asChild>
-                <Button
-                  variant="outline"
-                  onClick={() => onOpenChange(false)}
-                  className="h-10 rounded-lg border-border/40 hover:border-accent/30"
-                >
-                  Cancel
-                </Button>
+          <div className="border-t border-border/30 bg-muted/10 px-6 py-4">
+            <AlertDialogFooter>
+              <AlertDialogCancel
+                disabled={isLoading}
+                className="border-border/40"
+              >
+                Cancel
               </AlertDialogCancel>
-              <AlertDialogAction asChild>
-                <Button
-                  onClick={onConfirm}
-                  className="h-10 rounded-lg bg-gradient-to-r from-destructive to-destructive/90 hover:from-destructive/90 hover:to-destructive/80 shadow-sm hover:shadow transition-all"
-                >
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Delete Center
-                </Button>
-              </AlertDialogAction>
+              <Button
+                variant="destructive"
+                disabled={!isConfirmed || isLoading}
+                onClick={onConfirm}
+                className="gap-2"
+              >
+                {isLoading ? (
+                  "Deleting..."
+                ) : (
+                  <>
+                    <Trash2 className="h-4 w-4" />
+                    Delete Center
+                  </>
+                )}
+              </Button>
             </AlertDialogFooter>
           </div>
         </div>

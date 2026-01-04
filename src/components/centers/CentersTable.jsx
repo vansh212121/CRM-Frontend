@@ -8,8 +8,7 @@ import {
   MapPin,
   MoreVertical,
   Phone,
-  Calendar,
-  Users,
+  Pin,
 } from "lucide-react";
 import {
   Table,
@@ -33,14 +32,92 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Skeleton } from "@/components/ui/skeleton"; // Make sure you have this shadcn component
 
-export function CentersTable({ centers, onView, onEdit, onDelete }) {
+export function CentersTable({ centers, onView, onEdit, onDelete, isLoading }) {
+  // 1. LOADING STATE (Render Skeletons)
+  if (isLoading) {
+    return (
+      <div className="rounded-2xl border border-border/50 bg-card overflow-hidden shadow-sm">
+        {/* Same Header as Real Table for stability */}
+        <div className="border-b border-border/30 bg-gradient-to-r from-card to-card/95 px-6 py-4">
+          <div className="flex items-center gap-3">
+            <Skeleton className="h-10 w-10 rounded-lg" />
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-32" />
+              <Skeleton className="h-3 w-48" />
+            </div>
+          </div>
+        </div>
+
+        <div className="relative">
+          <Table>
+            <TableHeader>
+              <TableRow className="border-b border-border/30">
+                <TableHead className="py-4 pl-7 w-[300px]">
+                  <Skeleton className="h-4 w-24" />
+                </TableHead>
+                <TableHead className="py-4">
+                  <Skeleton className="h-4 w-16" />
+                </TableHead>
+                <TableHead className="py-4">
+                  <Skeleton className="h-4 w-24" />
+                </TableHead>
+                <TableHead className="py-4">
+                  <Skeleton className="h-4 w-16" />
+                </TableHead>
+                <TableHead className="py-4 pr-6 text-right">
+                  <Skeleton className="h-4 w-12 ml-auto" />
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {[...Array(5)].map((_, i) => (
+                <TableRow key={i} className="border-b border-border/20">
+                  <TableCell className="py-5 pl-7">
+                    <div className="flex items-center gap-4">
+                      <Skeleton className="h-10 w-10 rounded-full" />
+                      <div className="space-y-2">
+                        <Skeleton className="h-4 w-32" />
+                        <Skeleton className="h-3 w-20" />
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Skeleton className="h-4 w-24" />
+                  </TableCell>
+                  <TableCell>
+                    <div className="space-y-2">
+                      <Skeleton className="h-4 w-32" />
+                      <Skeleton className="h-3 w-24" />
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Skeleton className="h-6 w-16 rounded-full" />
+                  </TableCell>
+                  <TableCell className="pr-6">
+                    <div className="flex justify-end gap-2">
+                      <Skeleton className="h-9 w-9 rounded-lg" />
+                      <Skeleton className="h-9 w-9 rounded-lg" />
+                      <Skeleton className="h-9 w-9 rounded-lg" />
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+    );
+  }
+
+  // 2. EMPTY STATE (Only show if NOT loading and NO data)
   if (centers.length === 0) {
     return (
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-accent/20 bg-gradient-to-br from-card to-card/50 p-12 backdrop-blur-sm"
+        className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-accent/20 bg-gradient-to-br from-card to-card/50 p-12 backdrop-blur-sm min-h-[400px]"
       >
         <div className="relative mb-6">
           <div className="absolute inset-0 bg-gradient-to-r from-accent/10 to-purple-300/10 blur-xl rounded-full" />
@@ -49,16 +126,16 @@ export function CentersTable({ centers, onView, onEdit, onDelete }) {
           </div>
         </div>
         <h3 className="text-base font-semibold text-foreground mb-2">
-          No centers yet
+          No centers found
         </h3>
         <p className="text-sm text-muted-foreground/80 text-center max-w-sm">
-          Start by adding your first clinical center to manage appointments and
-          resources
+          Try adjusting your search filters or add a new center to get started.
         </p>
       </motion.div>
     );
   }
 
+  // 3. DATA STATE (Real Table)
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
@@ -89,21 +166,11 @@ export function CentersTable({ centers, onView, onEdit, onDelete }) {
                 {centers.length}
               </p>
             </div>
-            <div className="h-10 w-px bg-border/30" />
-            <div className="text-right">
-              <p className="text-xs text-muted-foreground/80">Active Today</p>
-              <p className="text-xl font-semibold text-accent">
-                {centers.filter((c) => c.active).length}
-              </p>
-            </div>
           </div>
         </div>
       </div>
 
       <div className="relative">
-        {/* Subtle decorative gradient */}
-        <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-accent/30 via-purple-300/20 to-transparent" />
-
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent border-b border-border/30">
@@ -111,13 +178,13 @@ export function CentersTable({ centers, onView, onEdit, onDelete }) {
                 Center Details
               </TableHead>
               <TableHead className="py-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                Location
+                District
               </TableHead>
               <TableHead className="py-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 Contact Info
               </TableHead>
               <TableHead className="py-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                Status
+                Pincode
               </TableHead>
               <TableHead className="py-4 pr-6 text-xs font-medium text-muted-foreground uppercase tracking-wider text-right">
                 Actions
@@ -137,7 +204,7 @@ export function CentersTable({ centers, onView, onEdit, onDelete }) {
                   <div className="flex items-center gap-4">
                     <Avatar className="h-10 w-10 border-2 border-accent/20 bg-gradient-to-br from-accent/10 to-purple-300/10">
                       <AvatarFallback className="bg-gradient-to-br from-accent/15 to-purple-300/15 text-accent font-semibold">
-                        {center.name.substring(0, 2).toUpperCase()}
+                        {center.name?.substring(0, 2).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
                     <div>
@@ -155,13 +222,9 @@ export function CentersTable({ centers, onView, onEdit, onDelete }) {
                         )}
                       </div>
                       <div className="flex items-center gap-3 mt-1.5">
-                        <span className="inline-flex items-center gap-1 text-xs text-muted-foreground/80">
-                          <Users className="h-3 w-3" />
-                          {center.patientCount || 0} patients
-                        </span>
-                        <span className="inline-flex items-center gap-1 text-xs text-muted-foreground/80">
-                          <Calendar className="h-3 w-3" />
-                          {center.appointmentCount || 0} appointments
+                        <span className="inline-flex items-center gap-1 text-sm text-foreground/80">
+                          <Pin className="h-3 w-3 text-foreground/80" />
+                          {center.location || center.district}
                         </span>
                       </div>
                     </div>
@@ -173,11 +236,6 @@ export function CentersTable({ centers, onView, onEdit, onDelete }) {
                       <MapPin className="h-3.5 w-3.5 text-accent/70" />
                       <span className="text-sm text-foreground">
                         {center.district}
-                      </span>
-                    </div>
-                    <div className="pl-5">
-                      <span className="text-xs text-muted-foreground/80 font-mono bg-secondary/20 px-2 py-1 rounded">
-                        PIN: {center.pincode}
                       </span>
                     </div>
                   </div>
@@ -193,11 +251,11 @@ export function CentersTable({ centers, onView, onEdit, onDelete }) {
                         {center.email}
                       </a>
                     </div>
-                    {center.phone && (
+                    {center.contact && (
                       <div className="flex items-center gap-2">
                         <Phone className="h-3.5 w-3.5 text-accent/70" />
                         <span className="text-sm text-muted-foreground">
-                          {center.phone}
+                          {center.contact}
                         </span>
                       </div>
                     )}
@@ -205,29 +263,9 @@ export function CentersTable({ centers, onView, onEdit, onDelete }) {
                 </TableCell>
                 <TableCell className="py-5">
                   <div className="flex items-center gap-2">
-                    <div
-                      className={`h-2 w-2 rounded-full ${
-                        center.active ? "bg-success animate-pulse" : "bg-muted"
-                      }`}
-                    />
-                    <Badge
-                      variant={center.active ? "default" : "outline"}
-                      className={`text-xs font-medium px-2.5 py-1 ${
-                        center.active
-                          ? "bg-gradient-to-r from-success/15 to-success/5 text-success border border-success/20"
-                          : "bg-secondary/20 text-muted-foreground border-border/40"
-                      }`}
-                    >
-                      {center.active ? "Active" : "Inactive"}
+                    <Badge className="bg-accent/70 hover:bg-accent/70 cursor-default">
+                      PIN: {center.pincode}
                     </Badge>
-                    {center.busy && (
-                      <Badge
-                        variant="outline"
-                        className="text-xs px-2 py-1 border-warning/30 text-warning bg-warning/10"
-                      >
-                        Busy
-                      </Badge>
-                    )}
                   </div>
                 </TableCell>
                 <TableCell className="py-5 pr-6">
@@ -240,14 +278,14 @@ export function CentersTable({ centers, onView, onEdit, onDelete }) {
                             size="sm"
                             variant="outline"
                             onClick={() => onView(center)}
-                            className="h-9 w-9 rounded-lg border-border/40 hover:border-accent/50 hover:bg-accent/5 transition-all"
+                            className="h-9 w-9 rounded-lg border-border/40 hover:border-accent/50 hover:bg-blue-400 transition-all"
                           >
                             <Eye className="h-4 w-4" />
                           </Button>
                         </TooltipTrigger>
                         <TooltipContent
                           side="top"
-                          className="text-xs px-2 py-1"
+                          className="text-xs px-2 py-1 bg-accent"
                         >
                           View details
                         </TooltipContent>
@@ -258,14 +296,14 @@ export function CentersTable({ centers, onView, onEdit, onDelete }) {
                             size="sm"
                             variant="outline"
                             onClick={() => onEdit(center)}
-                            className="h-9 w-9 rounded-lg border-border/40 hover:border-accent/50 hover:bg-accent/5 transition-all"
+                            className="h-9 w-9 rounded-lg border-border/40 hover:border-accent/50 hover:bg-green-400 transition-all"
                           >
                             <Pencil className="h-4 w-4" />
                           </Button>
                         </TooltipTrigger>
                         <TooltipContent
                           side="top"
-                          className="text-xs px-2 py-1"
+                          className="text-xs px-2 py-1 bg-accent"
                         >
                           Edit center
                         </TooltipContent>
@@ -276,14 +314,14 @@ export function CentersTable({ centers, onView, onEdit, onDelete }) {
                             size="sm"
                             variant="outline"
                             onClick={() => onDelete(center)}
-                            className="h-9 w-9 rounded-lg border-border/40 hover:border-destructive/50 hover:bg-destructive/5 transition-all"
+                            className="h-9 w-9 rounded-lg border-border/40 hover:border-destructive/50 hover:bg-destructive transition-all"
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </TooltipTrigger>
                         <TooltipContent
                           side="top"
-                          className="text-xs px-2 py-1"
+                          className="text-xs px-2 py-1 bg-accent"
                         >
                           Delete center
                         </TooltipContent>
@@ -337,43 +375,6 @@ export function CentersTable({ centers, onView, onEdit, onDelete }) {
           </TableBody>
         </Table>
       </div>
-
-      {/* Table Footer */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.4 }}
-        className="border-t border-border/30 bg-gradient-to-r from-card/80 to-card/50 px-6 py-3.5"
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2">
-              <div className="h-2 w-2 rounded-full bg-accent animate-pulse" />
-              <span className="text-xs text-muted-foreground/80">
-                <span className="font-medium text-accent">
-                  {centers.filter((c) => c.active).length}
-                </span>{" "}
-                active centers
-              </span>
-            </div>
-            <div className="h-3 w-px bg-border/30" />
-            <div className="flex items-center gap-2">
-              <div className="h-2 w-2 rounded-full bg-success" />
-              <span className="text-xs text-muted-foreground/80">
-                All systems operational
-              </span>
-            </div>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="text-right">
-              <p className="text-xs text-muted-foreground/80">
-                Last synchronized
-              </p>
-              <p className="text-xs font-medium text-foreground">Just now</p>
-            </div>
-          </div>
-        </div>
-      </motion.div>
     </motion.div>
   );
 }
