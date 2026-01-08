@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -20,25 +20,311 @@ import {
   TrendingUp,
   Filter,
   CalendarDays,
+  Loader2,
 } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { PendingRequestsTable } from "@/components/appointments/PendingRequestsTable";
-import { ConfirmedScheduleTable } from "@/components/appointments/ConfirmedScheduleTable";
-import { ScheduleAppointmentModal } from "@/components/appointments/ScheduleAppointmentModal";
+import { PendingRequestsTable } from "@/components/appointments/tables/PendingRequestsTable";
+import { CompletedAppointmentTable } from "@/components/appointments/tables/CompletedAppointmentTable";
+import { UpcomingAppointmentTable } from "@/components/appointments/tables/UpcomingAppointmentTable";
+import { CancelledTable } from "@/components/appointments/tables/CancelledScheduledTable";
+import { ScheduleAppointmentModal } from "@/components/appointments/modals/ScheduleAppointmentModal";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { useDebounce } from "@/hooks/useDebounce";
 import {
   mockPendingRequests,
   mockConfirmedAppointments,
   mockCenters,
 } from "@/data/mockData";
+import { RejectedTable } from "@/components/appointments/tables/RejectedAppointmentTable";
+import {
+  useCancelAppointmentMutation,
+  useConfirmAppointmentMutation,
+  useDeleteAppointmentMutation,
+  useGetAllAppointmentsQuery,
+  useRejectAppointmentMutation,
+  useRescheduleAppointmentMutation,
+  useScheduleAppointmentMutation,
+} from "@/features/api/appointmentApi";
+import { toast } from "sonner";
+import { handleError } from "@/lib/handleError";
 
 export default function Appointments() {
   const [pendingRequests, setPendingRequests] = useState(mockPendingRequests);
   const [confirmedAppointments, setConfirmedAppointments] = useState(
     mockConfirmedAppointments
   );
+
+  // Helper function to merge Date object + Time string into ISO string
+  const combineDateAndTime = (date, timeString) => {
+    if (!date || !timeString) return null;
+
+    // 1. Create a fresh date object from the selected date
+    const combined = new Date(date);
+
+    // 2. Parse "10:30 AM" -> Hours and Minutes
+    const [time, modifier] = timeString.split(" ");
+    let [hours, minutes] = time.split(":");
+
+    if (hours === "12") {
+      hours = "00";
+    }
+    if (modifier === "PM") {
+      hours = parseInt(hours, 10) + 12;
+    }
+
+    // 3. Set the time on the date object
+    combined.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0, 0);
+
+    // 4. Return ISO string for backend
+    return combined.toISOString();
+  };
+
+  // Confirm API
+  const [confirmAppointment, { isLoading: isConfirming }] =
+    useConfirmAppointmentMutation();
+
+  const handleConfirm = async (appointmentId, formData) => {
+    try {
+      // Merge Date & Time
+      const isoDate = combineDateAndTime(formData.date, formData.time);
+
+      if (!isoDate) {
+        toast.error("Please select both date and time"); // Or use a toast
+        return;
+      }
+
+      // Prepare Payload
+      const payload = {
+        id: appointmentId,
+        appointment_date: isoDate,
+        notes: formData.notes || "",
+      };
+
+      // Send Request
+      await confirmAppointment(payload).unwrap();
+      toast.success("Appointment Confirmed!");
+    } catch (err) {
+      handleError(err, "Failed to  Confirm Appointment");
+    }
+  };
+
+  // Schedule Appointment API
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
+  const [scheduleAppointment, { isLoading: isScheduling }] =
+    useScheduleAppointmentMutation();
+
+  const handleScheduleNew = async (formData) => {
+    try {
+      // Merge Date & Time
+      const isoDate = combineDateAndTime(formData.date, formData.time);
+
+      if (!isoDate) {
+        toast.error("Please select both date and time"); // Or use a toast
+        return;
+      }
+
+      // Prepare Payload
+      const payload = {
+        name: formData.patientName, // UI field -> API field
+        email: formData.email,
+        contact: formData.phone,
+        appointment_date: isoDate,
+        notes: formData.notes || "",
+      };
+
+      // Send Request
+      await scheduleAppointment(payload).unwrap();
+
+      // Success!
+      setScheduleModalOpen(false);
+      toast.success("Appointment scheduled!");
+    } catch (error) {
+      handleError(error, "Failed to  schedule Appointment");
+    }
+  };
+
+  // Reschedule Appointment API
+  const [rescheduleAppointment, { isLoading: isRescheduling }] =
+    useRescheduleAppointmentMutation();
+
+  const handleReschedule = async (appointmentId, formData) => {
+    try {
+      // Merge Date & Time
+      const isoDate = combineDateAndTime(formData.date, formData.time);
+
+      if (!isoDate) {
+        toast.error("Please select both date and time"); // Or use a toast
+        return;
+      }
+
+      // Prepare Payload
+      const payload = {
+        id: appointmentId,
+        appointment_date: isoDate,
+      };
+
+      // Send Request
+      await rescheduleAppointment(payload).unwrap();
+      toast.success("Appointment Rescheduled!");
+    } catch (err) {
+      handleError(err, "Failed to  Resschedule Appointment");
+    }
+  };
+
+  // Cancel Appointment API
+  const [cancelAppointment, { isLoading: isCancelling }] =
+    useCancelAppointmentMutation();
+
+  const handleCancel = async (appointmentId, reasonString) => {
+    try {
+      // Prepare Payload
+      const payload = {
+        id: appointmentId,
+        cancellation_reason: reasonString,
+      };
+
+      // Send Request
+      await cancelAppointment(payload).unwrap();
+      console.log("PAYLOAD", { payload });
+
+      toast.success("Appointment Cancelled!");
+    } catch (err) {
+      handleError(err, "Failed to  Cancel Appointment");
+    }
+  };
+
+  // Reject Appointment API
+  const [rejectAppointment, { isLoading: isRejecting }] =
+    useRejectAppointmentMutation();
+
+  const handleReject = async (appointmentId, reasonString) => {
+    try {
+      // Prepare Payload
+      const payload = {
+        id: appointmentId,
+        cancellation_reason: reasonString,
+      };
+
+      // Send Request
+      await rejectAppointment(payload).unwrap();
+      toast.success("Appointment Rejected!");
+    } catch (err) {
+      handleError(err, "Failed to  Rejected Appointment");
+    }
+  };
+
+  //Delete Appointment API
+  const [deleteAppointment, { isLoading: isDeleting }] =
+    useDeleteAppointmentMutation();
+
+  const handleDelete = async (appointmentId) => {
+    try {
+      await deleteAppointment(appointmentId).unwrap();
+      toast.success("Appointment Deleted successfully");
+    } catch (err) {
+      handleError(err, "Failed to  Delete Appointment");
+    }
+  };
+
+  // GET ALL APPOINTMENTS
+  const [activeTab, setActiveTab] = useState("pending");
+  const [search, setSearch] = useState("");
+
+  // Pagination / sorting
+  const [currentPage, setCurrentPage] = useState(1);
+  const [sort, setSort] = useState("newest");
+  const pageSize = 10;
+
+  // Debounce search
+  const debouncedSearch = useDebounce(search, 500);
+
+  // Reset page on search change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearch]);
+
+  // Query params
+  const queryParams = useMemo(() => {
+    const params = {
+      page: currentPage,
+      size: pageSize,
+      order_by: "created_at",
+      order_desc: sort === "newest",
+    };
+
+    if (debouncedSearch) {
+      params.search = debouncedSearch;
+    }
+
+    // Filter by Status based on the Active Tab
+    switch (activeTab) {
+      case "pending":
+        params.status = "pending";
+        break;
+      case "upcoming":
+        // Fetch future/active appointments
+        params.status = "upcoming";
+        break;
+      case "completed":
+        params.status = "completed";
+        break;
+      case "cancelled":
+        // Fetc Rejected here
+        params.status = "cancelled";
+        break;
+      case "rejected":
+        // Fetch Cancelled here
+        params.status = "rejected";
+        break;
+      default:
+        params.status = "pending";
+    }
+
+    return params;
+  }, [currentPage, debouncedSearch, sort, activeTab]);
+
+  const {
+    data: appointmentData,
+    isLoading: isAppointmentLoading,
+    isFetching,
+  } = useGetAllAppointmentsQuery(queryParams);
+
+  const appointments = useMemo(() => {
+    if (!appointmentData?.items) return [];
+
+    return appointmentData.items.map((item) => ({
+      // Shared Fields
+      id: item.id,
+      patientName: item.name,
+      email: item.email,
+      phone: item.contact,
+      status: item.status,
+      notes: item.notes,
+
+      // For Pending Table (Submission Time)
+      submissionDate: item.created_at,
+      preferences: item.notes,
+
+      // For Upcoming/History Tables (Scheduled Time)
+      confirmedDate: item.appointment_date,
+      confirmedTime: item.appointment_date
+        ? new Date(item.appointment_date).toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          })
+        : "",
+
+      completedDate: item.updated_at,
+      cancellationReason: item.cancellation_reason,
+
+      // Center Info (Placeholder logic until API sends center details)
+      centerName: "Center Info Missing",
+      centerId: item.center_id || "unknown",
+    }));
+  }, [appointmentData]);
+
+  const totalPages = Math.ceil((appointmentData?.total || 0) / pageSize) || 1;
 
   // Search & Filter state
   const [pendingSearch, setPendingSearch] = useState("");
@@ -90,78 +376,6 @@ export default function Appointments() {
     }),
     [pendingRequests, confirmedAppointments]
   );
-
-  const handleConfirm = (requestId, data) => {
-    const request = pendingRequests.find((r) => r.id === requestId);
-    if (!request) return;
-
-    const center = mockCenters.find((c) => c.id === data.centerId);
-
-    const newAppointment = {
-      id: `apt-${Date.now()}`,
-      patientName: request.patientName,
-      email: request.email,
-      phone: request.phone,
-      confirmedDate: data.date,
-      confirmedTime: data.time,
-      centerId: data.centerId,
-      centerName: center?.name || "Unknown Center",
-      status: "scheduled",
-      notes: data.notes,
-    };
-
-    setConfirmedAppointments((prev) => [...prev, newAppointment]);
-    setPendingRequests((prev) => prev.filter((r) => r.id !== requestId));
-  };
-
-  const handleReject = (requestId) => {
-    setPendingRequests((prev) => prev.filter((r) => r.id !== requestId));
-  };
-
-  const handleReschedule = (appointmentId, data) => {
-    const center = mockCenters.find((c) => c.id === data.centerId);
-
-    setConfirmedAppointments((prev) =>
-      prev.map((apt) =>
-        apt.id === appointmentId
-          ? {
-              ...apt,
-              confirmedDate: data.date,
-              confirmedTime: data.time,
-              centerId: data.centerId,
-              centerName: center?.name || apt.centerName,
-            }
-          : apt
-      )
-    );
-  };
-
-  const handleCancel = (appointmentId) => {
-    setConfirmedAppointments((prev) =>
-      prev.map((apt) =>
-        apt.id === appointmentId ? { ...apt, status: "cancelled" } : apt
-      )
-    );
-  };
-
-  const handleScheduleNew = (data) => {
-    const center = mockCenters.find((c) => c.id === data.centerId);
-
-    const newAppointment = {
-      id: `apt-${Date.now()}`,
-      patientName: data.patientName,
-      email: data.email,
-      phone: data.phone,
-      confirmedDate: data.date,
-      confirmedTime: data.time,
-      centerId: data.centerId,
-      centerName: center?.name || "Unknown Center",
-      status: "scheduled",
-      notes: data.notes,
-    };
-
-    setConfirmedAppointments((prev) => [...prev, newAppointment]);
-  };
 
   return (
     <DashboardLayout>
@@ -316,7 +530,11 @@ export default function Appointments() {
           transition={{ delay: 0.3 }}
           className="rounded-xl border border-border/50 bg-card overflow-hidden shadow-sm"
         >
-          <Tabs defaultValue="pending" className="w-full">
+          <Tabs
+            value={activeTab}
+            onValueChange={setActiveTab}
+            className="w-full"
+          >
             {/* Tabs Header */}
             <div className="border-b border-border/40 px-6 py-4">
               <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
@@ -338,11 +556,35 @@ export default function Appointments() {
                   </TabsTrigger>
 
                   <TabsTrigger
-                    value="confirmed"
+                    value="upcoming"
                     className="gap-2 rounded-md px-4 data-[state=active]:bg-accent/10 data-[state=active]:text-accent data-[state=active]:border data-[state=active]:border-accent/20"
                   >
                     <CheckCircle2 className="h-4 w-4" />
-                    <span>Confirmed Appointments</span>
+                    <span>Upcoming Appointments</span>
+                  </TabsTrigger>
+
+                  <TabsTrigger
+                    value="completed"
+                    className="gap-2 rounded-md px-4 data-[state=active]:bg-accent/10 data-[state=active]:text-accent data-[state=active]:border data-[state=active]:border-accent/20"
+                  >
+                    <CheckCircle2 className="h-4 w-4" />
+                    <span>Completed Appointments</span>
+                  </TabsTrigger>
+
+                  <TabsTrigger
+                    value="cancelled"
+                    className="gap-2 rounded-md px-4 data-[state=active]:bg-accent/10 data-[state=active]:text-accent data-[state=active]:border data-[state=active]:border-accent/20"
+                  >
+                    <CheckCircle2 className="h-4 w-4" />
+                    <span>Cancelled Appointments</span>
+                  </TabsTrigger>
+
+                  <TabsTrigger
+                    value="rejected"
+                    className="gap-2 rounded-md px-4 data-[state=active]:bg-accent/10 data-[state=active]:text-accent data-[state=active]:border data-[state=active]:border-accent/20"
+                  >
+                    <CheckCircle2 className="h-4 w-4" />
+                    <span>Rejected Appointments</span>
                   </TabsTrigger>
                 </TabsList>
 
@@ -392,18 +634,76 @@ export default function Appointments() {
                   </div>
 
                   {/* Table */}
-                  <PendingRequestsTable
-                    requests={filteredPendingRequests}
-                    centers={mockCenters}
-                    onConfirm={handleConfirm}
-                    onReject={handleReject}
-                  />
+                  {isAppointmentLoading ? (
+                    <div className="flex justify-center py-12">
+                      <Loader2 className="h-8 w-8 animate-spin text-accent" />
+                    </div>
+                  ) : (
+                    <PendingRequestsTable
+                      requests={appointments}
+                      onConfirm={handleConfirm}
+                      onReject={handleReject}
+                      isConfirming={isConfirming}
+                      isRejecting={isRejecting}
+                    />
+                  )}
                 </motion.div>
               </AnimatePresence>
             </TabsContent>
 
-            {/* Tabs Content - Confirmed */}
-            <TabsContent value="confirmed" className="mt-0 p-6">
+            {/* Tabs Content - Upcoming */}
+            <TabsContent value="upcoming" className="mt-0 p-6">
+              <AnimatePresence mode="wait">
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  className="space-y-4"
+                >
+                  {/* Search Bar */}
+                  <div className="rounded-lg border border-border/40 bg-gradient-to-r from-card to-card/90 p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="relative flex-1">
+                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/60" />
+                        <Input
+                          placeholder="Search pending requests by name, email, or phone..."
+                          value={pendingSearch}
+                          onChange={(e) => setPendingSearch(e.target.value)}
+                          className="pl-9 h-10 rounded-lg border-border/40 focus:border-accent/50"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="h-4 w-px bg-border/30" />
+                        <Badge
+                          variant="outline"
+                          className="text-xs px-2 py-1 border-accent/30 text-accent bg-accent/10"
+                        >
+                          {filteredPendingRequests.length} requests
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Table */}
+                  {isAppointmentLoading ? (
+                    <div className="flex justify-center py-12">
+                      <Loader2 className="h-8 w-8 animate-spin text-accent" />
+                    </div>
+                  ) : (
+                    <UpcomingAppointmentTable
+                      appointments={appointments}
+                      onReschedule={handleReschedule}
+                      onCancel={handleCancel}
+                      isRescheduling={isRescheduling}
+                      isCancelling={isCancelling}
+                    />
+                  )}
+                </motion.div>
+              </AnimatePresence>
+            </TabsContent>
+
+            {/* Tabs Content - Completed */}
+            <TabsContent value="completed" className="mt-0 p-6">
               <AnimatePresence mode="wait">
                 <motion.div
                   initial={{ opacity: 0, y: 8 }}
@@ -513,25 +813,293 @@ export default function Appointments() {
                   </div>
 
                   {/* Table */}
-                  <ConfirmedScheduleTable
-                    appointments={filteredConfirmedAppointments}
-                    centers={mockCenters}
-                    onReschedule={handleReschedule}
-                    onCancel={handleCancel}
+                  <CompletedAppointmentTable
+                    appointments={appointments}
+                    onDelete={handleDelete}
+                    isDeleting={isDeleting}
+                  />
+                </motion.div>
+              </AnimatePresence>
+            </TabsContent>
+
+            {/* Tabs Content - Cancelled */}
+            <TabsContent value="cancelled" className="mt-0 p-6">
+              <AnimatePresence mode="wait">
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  className="space-y-4"
+                >
+                  {/* Filter Bar */}
+                  <div className="rounded-lg border border-border/40 bg-gradient-to-r from-card to-card/90 p-4">
+                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                      <div className="flex-1">
+                        <div className="relative">
+                          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/60" />
+                          <Input
+                            placeholder="Search appointments by patient, center, or email..."
+                            value={confirmedSearch}
+                            onChange={(e) => setConfirmedSearch(e.target.value)}
+                            className="pl-9 h-10 rounded-lg border-border/40 focus:border-accent/50"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <Select
+                          value={statusFilter}
+                          onValueChange={setStatusFilter}
+                        >
+                          <SelectTrigger className="w-36 h-10 rounded-lg border-border/40">
+                            <div className="flex items-center gap-2">
+                              <Filter className="h-4 w-4 text-muted-foreground/60" />
+                              <SelectValue placeholder="Status" />
+                            </div>
+                          </SelectTrigger>
+                          <SelectContent className="rounded-lg border border-border/50">
+                            <SelectItem
+                              value="all"
+                              className="text-sm rounded-lg"
+                            >
+                              All Status
+                            </SelectItem>
+                            <SelectItem
+                              value="scheduled"
+                              className="text-sm rounded-lg"
+                            >
+                              Scheduled
+                            </SelectItem>
+                            <SelectItem
+                              value="active"
+                              className="text-sm rounded-lg"
+                            >
+                              Active
+                            </SelectItem>
+                            <SelectItem
+                              value="completed"
+                              className="text-sm rounded-lg"
+                            >
+                              Completed
+                            </SelectItem>
+                            <SelectItem
+                              value="cancelled"
+                              className="text-sm rounded-lg"
+                            >
+                              Cancelled
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+
+                        <Select
+                          value={centerFilter}
+                          onValueChange={setCenterFilter}
+                        >
+                          <SelectTrigger className="w-40 h-10 rounded-lg border-border/40">
+                            <div className="flex items-center gap-2">
+                              <Filter className="h-4 w-4 text-muted-foreground/60" />
+                              <SelectValue placeholder="Center" />
+                            </div>
+                          </SelectTrigger>
+                          <SelectContent className="rounded-lg border border-border/50">
+                            <SelectItem
+                              value="all"
+                              className="text-sm rounded-lg"
+                            >
+                              All Centers
+                            </SelectItem>
+                            {mockCenters.map((center) => (
+                              <SelectItem
+                                key={center.id}
+                                value={center.id}
+                                className="text-sm rounded-lg"
+                              >
+                                {center.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+
+                        <div className="h-4 w-px bg-border/30" />
+
+                        <Badge
+                          variant="outline"
+                          className="text-xs px-2 py-1 border-accent/30 text-accent bg-accent/10"
+                        >
+                          {filteredConfirmedAppointments.length} appointments
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Table */}
+                  <CancelledTable
+                    appointments={appointments}
+                    onDelete={handleDelete}
+                    isDeleting={isDeleting}
+                  />
+                </motion.div>
+              </AnimatePresence>
+            </TabsContent>
+
+            {/* Tabs Content - Rejected */}
+            <TabsContent value="rejected" className="mt-0 p-6">
+              <AnimatePresence mode="wait">
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  className="space-y-4"
+                >
+                  {/* Filter Bar */}
+                  <div className="rounded-lg border border-border/40 bg-gradient-to-r from-card to-card/90 p-4">
+                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                      <div className="flex-1">
+                        <div className="relative">
+                          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/60" />
+                          <Input
+                            placeholder="Search appointments by patient, center, or email..."
+                            value={confirmedSearch}
+                            onChange={(e) => setConfirmedSearch(e.target.value)}
+                            className="pl-9 h-10 rounded-lg border-border/40 focus:border-accent/50"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <Select
+                          value={statusFilter}
+                          onValueChange={setStatusFilter}
+                        >
+                          <SelectTrigger className="w-36 h-10 rounded-lg border-border/40">
+                            <div className="flex items-center gap-2">
+                              <Filter className="h-4 w-4 text-muted-foreground/60" />
+                              <SelectValue placeholder="Status" />
+                            </div>
+                          </SelectTrigger>
+                          <SelectContent className="rounded-lg border border-border/50">
+                            <SelectItem
+                              value="all"
+                              className="text-sm rounded-lg"
+                            >
+                              All Status
+                            </SelectItem>
+                            <SelectItem
+                              value="scheduled"
+                              className="text-sm rounded-lg"
+                            >
+                              Scheduled
+                            </SelectItem>
+                            <SelectItem
+                              value="active"
+                              className="text-sm rounded-lg"
+                            >
+                              Active
+                            </SelectItem>
+                            <SelectItem
+                              value="completed"
+                              className="text-sm rounded-lg"
+                            >
+                              Completed
+                            </SelectItem>
+                            <SelectItem
+                              value="cancelled"
+                              className="text-sm rounded-lg"
+                            >
+                              Cancelled
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+
+                        <Select
+                          value={centerFilter}
+                          onValueChange={setCenterFilter}
+                        >
+                          <SelectTrigger className="w-40 h-10 rounded-lg border-border/40">
+                            <div className="flex items-center gap-2">
+                              <Filter className="h-4 w-4 text-muted-foreground/60" />
+                              <SelectValue placeholder="Center" />
+                            </div>
+                          </SelectTrigger>
+                          <SelectContent className="rounded-lg border border-border/50">
+                            <SelectItem
+                              value="all"
+                              className="text-sm rounded-lg"
+                            >
+                              All Centers
+                            </SelectItem>
+                            {mockCenters.map((center) => (
+                              <SelectItem
+                                key={center.id}
+                                value={center.id}
+                                className="text-sm rounded-lg"
+                              >
+                                {center.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+
+                        <div className="h-4 w-px bg-border/30" />
+
+                        <Badge
+                          variant="outline"
+                          className="text-xs px-2 py-1 border-accent/30 text-accent bg-accent/10"
+                        >
+                          {filteredConfirmedAppointments.length} appointments
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Table */}
+                  <RejectedTable
+                    appointments={appointments}
+                    onDelete={handleDelete}
+                    isDeleting={isDeleting}
                   />
                 </motion.div>
               </AnimatePresence>
             </TabsContent>
           </Tabs>
+
+          {/* Pagination Controls */}
+          {!isAppointmentLoading && appointmentData?.items?.length > 0 && (
+            <div className="flex items-center justify-between px-6 py-4 border-t border-border/40 bg-muted/5">
+              <p className="text-sm text-muted-foreground">
+                Page {currentPage} of {totalPages}
+              </p>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage === 1 || isFetching}
+                >
+                  Previous
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    setCurrentPage((p) => Math.min(totalPages, p + 1))
+                  }
+                  disabled={currentPage === totalPages || isFetching}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
         </motion.div>
       </div>
 
       {/* Schedule New Appointment Modal */}
       <ScheduleAppointmentModal
-        centers={mockCenters}
         open={scheduleModalOpen}
         onOpenChange={setScheduleModalOpen}
         onSchedule={handleScheduleNew}
+        isLoading={isScheduling}
       />
     </DashboardLayout>
   );

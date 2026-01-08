@@ -3,6 +3,7 @@ import rootReducer from "./rootReducer";
 import { authApi } from "@/features/api/authApi";
 import { userApi } from "@/features/api/userApi";
 import { centerApi } from "@/features/api/centerApi";
+import { appointmentApi } from "@/features/api/appointmentApi";
 
 export const appStore = configureStore({
     reducer: rootReducer,
@@ -11,6 +12,7 @@ export const appStore = configureStore({
             authApi.middleware,
             userApi.middleware,
             centerApi.middleware,
+            appointmentApi.middleware
 
         ),
 });

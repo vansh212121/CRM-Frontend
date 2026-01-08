@@ -73,6 +73,94 @@ export const mockPendingRequests = [
     }
 ]
 
+export const mockUpcomingAppointments = [
+    {
+        id: "apt-001",
+        patientName: "Lisa Anderson",
+        email: "l.anderson@email.com",
+        phone: "+1 (555) 111-2222",
+        confirmedDate: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000), // Tomorrow
+        confirmedTime: "09:30",
+        centerId: "ctr-001",
+        centerName: "NeuroFlow Downtown Clinic",
+        status: "confirmed", // Was 'active'
+        notes: "First-time patient, bring previous MRI records"
+    },
+    {
+        id: "apt-002",
+        patientName: "Thomas Wright",
+        email: "t.wright@email.com",
+        phone: "+1 (555) 222-3333",
+        confirmedDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000), // In 2 days
+        confirmedTime: "14:00",
+        centerId: "ctr-003",
+        centerName: "Harbor View Diagnostic Lab",
+        status: "confirmed"
+    },
+    {
+        id: "apt-004",
+        patientName: "Kevin O'Brien",
+        email: "k.obrien@email.com",
+        phone: "+1 (555) 444-5555",
+        confirmedDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
+        confirmedTime: "10:30",
+        centerId: "ctr-004",
+        centerName: "Northgate Brain Health",
+        status: "confirmed",
+        notes: "Follow-up from previous consultation"
+    },
+    {
+        id: "apt-006",
+        patientName: "Richard Lee",
+        email: "r.lee@email.com",
+        phone: "+1 (555) 666-7777",
+        confirmedDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
+        confirmedTime: "08:00",
+        centerId: "ctr-005",
+        centerName: "Riverside Neuro Institute",
+        status: "confirmed"
+    }
+];
+
+export const mockConfirmedAppointments = [
+    {
+        id: "apt-003",
+        patientName: "Maria Santos",
+        email: "m.santos@email.com",
+        phone: "+1 (555) 333-4444",
+        confirmedDate: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000), // Yesterday
+        confirmedTime: "11:00",
+        centerId: "ctr-002",
+        centerName: "Westside Neuroscience Center",
+        status: "completed"
+    },
+    {
+        id: "apt-005",
+        patientName: "Patricia Johnson",
+        email: "p.johnson@email.com",
+        phone: "+1 (555) 555-6666",
+        confirmedDate: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
+        confirmedTime: "15:30",
+        centerId: "ctr-001",
+        centerName: "NeuroFlow Downtown Clinic",
+        status: "cancelled"
+    },
+    {
+        id: "apt-007",
+        patientName: "James Wilson",
+        email: "j.wilson@email.com",
+        phone: "+1 (555) 777-8888",
+        confirmedDate: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
+        confirmedTime: "09:00",
+        centerId: "ctr-002",
+        centerName: "Westside Neuroscience Center",
+        status: "rejected",
+        notes: "Patient failed pre-screening requirements"
+    }
+
+]
+
+
 export const mockCenters = [
     {
         id: "ctr-001",
@@ -145,76 +233,5 @@ export const mockCenters = [
         pincode: "10016",
         phone: "+1 (555) 100-0008",
         address: "258 Commerce Street"
-    }
-]
-
-export const mockConfirmedAppointments = [
-    {
-        id: "apt-001",
-        patientName: "Lisa Anderson",
-        email: "l.anderson@email.com",
-        phone: "+1 (555) 111-2222",
-        confirmedDate: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000),
-        confirmedTime: "09:30",
-        centerId: "ctr-001",
-        centerName: "NeuroFlow Downtown Clinic",
-        status: "active",
-        notes: "First-time patient, bring previous MRI records"
-    },
-    {
-        id: "apt-002",
-        patientName: "Thomas Wright",
-        email: "t.wright@email.com",
-        phone: "+1 (555) 222-3333",
-        confirmedDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000),
-        confirmedTime: "14:00",
-        centerId: "ctr-003",
-        centerName: "Harbor View Diagnostic Lab",
-        status: "active"
-    },
-    {
-        id: "apt-003",
-        patientName: "Maria Santos",
-        email: "m.santos@email.com",
-        phone: "+1 (555) 333-4444",
-        confirmedDate: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
-        confirmedTime: "11:00",
-        centerId: "ctr-002",
-        centerName: "Westside Neuroscience Center",
-        status: "completed"
-    },
-    {
-        id: "apt-004",
-        patientName: "Kevin O'Brien",
-        email: "k.obrien@email.com",
-        phone: "+1 (555) 444-5555",
-        confirmedDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
-        confirmedTime: "10:30",
-        centerId: "ctr-004",
-        centerName: "Northgate Brain Health",
-        status: "active",
-        notes: "Follow-up from previous consultation"
-    },
-    {
-        id: "apt-005",
-        patientName: "Patricia Johnson",
-        email: "p.johnson@email.com",
-        phone: "+1 (555) 555-6666",
-        confirmedDate: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
-        confirmedTime: "15:30",
-        centerId: "ctr-001",
-        centerName: "NeuroFlow Downtown Clinic",
-        status: "cancelled"
-    },
-    {
-        id: "apt-006",
-        patientName: "Richard Lee",
-        email: "r.lee@email.com",
-        phone: "+1 (555) 666-7777",
-        confirmedDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
-        confirmedTime: "08:00",
-        centerId: "ctr-005",
-        centerName: "Riverside Neuro Institute",
-        status: "active"
     }
 ]
