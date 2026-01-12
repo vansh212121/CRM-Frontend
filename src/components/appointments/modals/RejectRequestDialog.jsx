@@ -42,7 +42,7 @@ export function RejectRequestDialog({
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent className="p-0 overflow-hidden sm:max-w-lg">
         <div className="rounded-xl border border-border/50 bg-card shadow-sm">
-          {/* Header - Preserved styling */}
+          {/* Header  */}
           <div className="border-b border-destructive/20 bg-destructive/5 px-6 py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -73,7 +73,7 @@ export function RejectRequestDialog({
           {/* Content */}
           <div className="px-6 py-5">
             <div className="space-y-5">
-              {/* Patient Info Card - Preserved styling */}
+              {/* Patient Info Card  */}
               {request && (
                 <div className="rounded-lg border border-border/30 p-4">
                   <div className="flex items-center gap-3">
@@ -97,7 +97,7 @@ export function RejectRequestDialog({
                 </div>
               )}
 
-              {/* Warning Message - Preserved styling */}
+              {/* Warning Message  */}
               <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-4">
                 <div className="flex items-start gap-3">
                   <AlertTriangle className="h-4 w-4 text-destructive mt-0.5" />
@@ -125,7 +125,7 @@ export function RejectRequestDialog({
                   placeholder="Example: No availability at requested time, please try another slot..."
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
-                  disabled={isLoading} // ✅ Disabled on load
+                  disabled={isLoading}
                   className="min-h-[100px] rounded-lg border-border/40 focus:border-destructive/50 focus:ring-destructive/20 transition-all resize-none"
                   rows={4}
                 />
@@ -163,7 +163,7 @@ export function RejectRequestDialog({
             </div>
           </div>
 
-          {/* Footer - Integrated Loading State */}
+          {/* Footer  */}
           <div className="border-t border-border/30 px-6 py-4">
             <AlertDialogFooter className="flex items-center justify-between gap-3">
               <AlertDialogCancel asChild>

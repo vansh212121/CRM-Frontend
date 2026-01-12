@@ -31,7 +31,7 @@ export default function Centers() {
   // Pagination / sorting
   const [currentPage, setCurrentPage] = useState(1);
   const [sort, setSort] = useState("newest");
-  const pageSize = 4;
+  const pageSize = 10;
 
   // Debounce search
   const debouncedSearch = useDebounce(search, 500);
@@ -57,8 +57,11 @@ export default function Centers() {
     return params;
   }, [currentPage, debouncedSearch, sort]);
 
-  const { data: centerData, isLoading: isCentersLoading, isFetching } =
-    useGetAllCentersQuery(queryParams);
+  const {
+    data: centerData,
+    isLoading: isCentersLoading,
+    isFetching,
+  } = useGetAllCentersQuery(queryParams);
 
   const centers = useMemo(() => {
     return centerData?.items ?? [];

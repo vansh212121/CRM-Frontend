@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { format } from "date-fns";
 import {
   CalendarIcon,
@@ -61,7 +61,7 @@ export function ScheduleAppointmentModal({
   open,
   onOpenChange,
   onSchedule,
-  isLoading, // ✅ New prop
+  isLoading,
 }) {
   const [patientName, setPatientName] = useState("");
   const [email, setEmail] = useState("");
@@ -69,6 +69,17 @@ export function ScheduleAppointmentModal({
   const [date, setDate] = useState(undefined);
   const [time, setTime] = useState("");
   const [notes, setNotes] = useState("");
+
+  useEffect(() => {
+    if (open) {
+      setPatientName("");
+      setEmail("");
+      setPhone("");
+      setDate(undefined);
+      setTime("");
+      setNotes("");
+    }
+  }, [open]);
 
   const handleSubmit = () => {
     // Basic validation safety check

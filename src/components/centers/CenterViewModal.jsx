@@ -4,19 +4,13 @@ import {
   Phone,
   MapPin,
   Globe,
-  X,
   Navigation,
   Map,
   Stethoscope,
   Landmark,
   ExternalLink,
 } from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-  DialogClose,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -44,15 +38,6 @@ export function CenterViewModal({ center, open, onOpenChange }) {
                   </p>
                 </div>
               </div>
-              <DialogClose asChild>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-8 w-8 rounded-lg hover:bg-accent/10"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </DialogClose>
             </div>
           </div>
 

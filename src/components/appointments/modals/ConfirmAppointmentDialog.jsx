@@ -1,19 +1,11 @@
 import { useState, useEffect } from "react";
 import { format } from "date-fns";
-import {
-  CalendarIcon,
-  Clock,
-  User,
-  CheckCircle,
-  X,
-  Loader2,
-} from "lucide-react";
+import { CalendarIcon, Clock, User, CheckCircle, Loader2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
   DialogTitle,
   DialogDescription,
-  DialogClose,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -66,7 +58,6 @@ export function ConfirmAppointmentModal({
   const [time, setTime] = useState("");
   const [notes, setNotes] = useState("");
 
-  // Only need to clear if opened fresh, dialog unmount handles most of this
   useEffect(() => {
     if (open) {
       setDate(undefined);
@@ -102,16 +93,6 @@ export function ConfirmAppointmentModal({
                   </DialogDescription>
                 </div>
               </div>
-              <DialogClose asChild>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  disabled={isLoading}
-                  className="h-8 w-8 rounded-lg hover:bg-accent/10"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </DialogClose>
             </div>
           </div>
 

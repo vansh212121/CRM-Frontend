@@ -2,43 +2,19 @@ import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Clock,
-  CheckCircle2,
-  Search,
-  Plus,
-  Calendar,
-  Users,
-  TrendingUp,
-  Filter,
-  CalendarDays,
-  Loader2,
-} from "lucide-react";
+import { format } from "date-fns";
+import { Clock, CheckCircle2, Plus, CalendarDays } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { PendingRequestsTable } from "@/components/appointments/tables/PendingRequestsTable";
 import { CompletedAppointmentTable } from "@/components/appointments/tables/CompletedAppointmentTable";
 import { UpcomingAppointmentTable } from "@/components/appointments/tables/UpcomingAppointmentTable";
 import { CancelledTable } from "@/components/appointments/tables/CancelledScheduledTable";
 import { ScheduleAppointmentModal } from "@/components/appointments/modals/ScheduleAppointmentModal";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { useDebounce } from "@/hooks/useDebounce";
-import {
-  mockPendingRequests,
-  mockConfirmedAppointments,
-  mockCenters,
-} from "@/data/mockData";
 import { RejectedTable } from "@/components/appointments/tables/RejectedAppointmentTable";
 import {
   useCancelAppointmentMutation,
+  useCompleteAppointmentMutation,
   useConfirmAppointmentMutation,
   useDeleteAppointmentMutation,
   useGetAllAppointmentsQuery,
@@ -48,36 +24,24 @@ import {
 } from "@/features/api/appointmentApi";
 import { toast } from "sonner";
 import { handleError } from "@/lib/handleError";
+import { AppointmentToolbar } from "@/components/appointments/AppointmentToolbar";
 
 export default function Appointments() {
-  const [pendingRequests, setPendingRequests] = useState(mockPendingRequests);
-  const [confirmedAppointments, setConfirmedAppointments] = useState(
-    mockConfirmedAppointments
-  );
-
   // Helper function to merge Date object + Time string into ISO string
   const combineDateAndTime = (date, timeString) => {
     if (!date || !timeString) return null;
 
-    // 1. Create a fresh date object from the selected date
-    const combined = new Date(date);
+    const dateStr = format(date, "yyyy-MM-dd");
 
-    // 2. Parse "10:30 AM" -> Hours and Minutes
     const [time, modifier] = timeString.split(" ");
     let [hours, minutes] = time.split(":");
 
-    if (hours === "12") {
-      hours = "00";
-    }
-    if (modifier === "PM") {
-      hours = parseInt(hours, 10) + 12;
-    }
+    if (hours === "12") hours = "00";
+    if (modifier === "PM") hours = parseInt(hours, 10) + 12;
 
-    // 3. Set the time on the date object
-    combined.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0, 0);
+    const formattedHours = hours.toString().padStart(2, "0");
 
-    // 4. Return ISO string for backend
-    return combined.toISOString();
+    return `${dateStr}T${formattedHours}:${minutes}:00Z`;
   };
 
   // Confirm API
@@ -120,13 +84,13 @@ export default function Appointments() {
       const isoDate = combineDateAndTime(formData.date, formData.time);
 
       if (!isoDate) {
-        toast.error("Please select both date and time"); // Or use a toast
+        toast.error("Please select both date and time");
         return;
       }
 
       // Prepare Payload
       const payload = {
-        name: formData.patientName, // UI field -> API field
+        name: formData.patientName,
         email: formData.email,
         contact: formData.phone,
         appointment_date: isoDate,
@@ -186,7 +150,6 @@ export default function Appointments() {
 
       // Send Request
       await cancelAppointment(payload).unwrap();
-      console.log("PAYLOAD", { payload });
 
       toast.success("Appointment Cancelled!");
     } catch (err) {
@@ -227,7 +190,28 @@ export default function Appointments() {
     }
   };
 
+  //Complete Appointment API
+  const [completeAppointment, { isLoading: isCompleting }] =
+    useCompleteAppointmentMutation();
+
+  const handleComplete = async (appointmentId, notes) => {
+    try {
+      // Prepare Payload
+      const payload = {
+        id: appointmentId,
+        notes: notes || "",
+      };
+      // Send Request
+      await completeAppointment(payload).unwrap();
+
+      toast.success("Appointment marked as Completed!");
+    } catch (err) {
+      handleError(err, "Failed to  mark Appointment as Completed!");
+    }
+  };
+
   // GET ALL APPOINTMENTS
+  const [dateRange, setDateRange] = useState(undefined);
   const [activeTab, setActiveTab] = useState("pending");
   const [search, setSearch] = useState("");
 
@@ -263,26 +247,55 @@ export default function Appointments() {
         params.status = "pending";
         break;
       case "upcoming":
-        // Fetch future/active appointments
         params.status = "upcoming";
         break;
       case "completed":
         params.status = "completed";
         break;
       case "cancelled":
-        // Fetc Rejected here
         params.status = "cancelled";
         break;
       case "rejected":
-        // Fetch Cancelled here
         params.status = "rejected";
         break;
       default:
         params.status = "pending";
     }
 
+    if (dateRange?.from) {
+      const fromDateStr = format(dateRange.from, "yyyy-MM-dd");
+      // If no 'to' date, default to single day filter (start = end)
+      const toDateStr = dateRange.to
+        ? format(dateRange.to, "yyyy-MM-dd")
+        : fromDateStr;
+
+      // Decide which backend fields to use
+      switch (activeTab) {
+        case "pending":
+          // Filter by Creation Date
+          params.created_after = fromDateStr;
+          params.created_before = toDateStr;
+          break;
+
+        case "completed":
+        case "cancelled":
+        case "rejected":
+          // Filter by Update/Action Date
+          params.updated_after = fromDateStr;
+          params.updated_before = toDateStr;
+          break;
+
+        case "upcoming":
+        default:
+          // Filter by Appointment Schedule Date
+          params.start_date = fromDateStr;
+          params.end_date = toDateStr;
+          break;
+      }
+    }
+
     return params;
-  }, [currentPage, debouncedSearch, sort, activeTab]);
+  }, [currentPage, debouncedSearch, sort, activeTab, dateRange, pageSize]);
 
   const {
     data: appointmentData,
@@ -326,60 +339,9 @@ export default function Appointments() {
 
   const totalPages = Math.ceil((appointmentData?.total || 0) / pageSize) || 1;
 
-  // Search & Filter state
-  const [pendingSearch, setPendingSearch] = useState("");
-  const [confirmedSearch, setConfirmedSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [centerFilter, setCenterFilter] = useState("all");
-
-  // Filtered data
-  const filteredPendingRequests = useMemo(() => {
-    return pendingRequests.filter((request) => {
-      const searchLower = pendingSearch.toLowerCase();
-      return (
-        request.patientName.toLowerCase().includes(searchLower) ||
-        request.email.toLowerCase().includes(searchLower) ||
-        request.phone.includes(pendingSearch)
-      );
-    });
-  }, [pendingRequests, pendingSearch]);
-
-  const filteredConfirmedAppointments = useMemo(() => {
-    return confirmedAppointments.filter((apt) => {
-      const searchLower = confirmedSearch.toLowerCase();
-      const matchesSearch =
-        apt.patientName.toLowerCase().includes(searchLower) ||
-        apt.email.toLowerCase().includes(searchLower) ||
-        apt.centerName.toLowerCase().includes(searchLower);
-
-      const matchesStatus =
-        statusFilter === "all" || apt.status === statusFilter;
-
-      const matchesCenter =
-        centerFilter === "all" || apt.centerId === centerFilter;
-
-      return matchesSearch && matchesStatus && matchesCenter;
-    });
-  }, [confirmedAppointments, confirmedSearch, statusFilter, centerFilter]);
-
-  // Stats
-  const stats = useMemo(
-    () => ({
-      pending: pendingRequests.length,
-      activeToday: confirmedAppointments.filter(
-        (a) => a.status === "active" || a.status === "scheduled"
-      ).length,
-      completed: confirmedAppointments.filter((a) => a.status === "completed")
-        .length,
-      upcoming: confirmedAppointments.filter((a) => a.status === "scheduled")
-        .length,
-    }),
-    [pendingRequests, confirmedAppointments]
-  );
-
   return (
     <DashboardLayout>
-      <div className="space-y-6">
+      <div className="space-y-12">
         {/* Header Section */}
         <motion.div
           initial={{ opacity: 0, y: -10 }}
@@ -410,117 +372,6 @@ export default function Appointments() {
               Schedule Appointment
             </Button>
           </div>
-
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-            >
-              <Card className="border-border/40 hover:border-border/60 transition-colors">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs text-muted-foreground/80">
-                        Pending Requests
-                      </p>
-                      <p className="text-2xl font-semibold text-warning mt-1">
-                        {stats.pending}
-                      </p>
-                    </div>
-                    <div className="rounded-lg bg-warning/10 p-2 border border-warning/20">
-                      <Clock className="h-4 w-4 text-warning" />
-                    </div>
-                  </div>
-                  <div className="h-1 w-full bg-muted rounded-full overflow-hidden mt-3">
-                    <div className="h-full bg-warning w-full"></div>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.15 }}
-            >
-              <Card className="border-border/40 hover:border-border/60 transition-colors">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs text-muted-foreground/80">
-                        Upcoming
-                      </p>
-                      <p className="text-2xl font-semibold text-accent mt-1">
-                        {stats.upcoming}
-                      </p>
-                    </div>
-                    <div className="rounded-lg bg-accent/10 p-2 border border-accent/20">
-                      <Calendar className="h-4 w-4 text-accent" />
-                    </div>
-                  </div>
-                  <div className="h-1 w-full bg-muted rounded-full overflow-hidden mt-3">
-                    <div className="h-full bg-accent w-3/4"></div>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-            >
-              <Card className="border-border/40 hover:border-border/60 transition-colors">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs text-muted-foreground/80">
-                        Active Today
-                      </p>
-                      <p className="text-2xl font-semibold text-success mt-1">
-                        {stats.activeToday}
-                      </p>
-                    </div>
-                    <div className="rounded-lg bg-success/10 p-2 border border-success/20">
-                      <Users className="h-4 w-4 text-success" />
-                    </div>
-                  </div>
-                  <div className="h-1 w-full bg-muted rounded-full overflow-hidden mt-3">
-                    <div className="h-full bg-success w-2/3"></div>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.25 }}
-            >
-              <Card className="border-border/40 hover:border-border/60 transition-colors">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs text-muted-foreground/80">
-                        Completed
-                      </p>
-                      <p className="text-2xl font-semibold text-foreground mt-1">
-                        {stats.completed}
-                      </p>
-                    </div>
-                    <div className="rounded-lg bg-accent/10 p-2 border border-accent/20">
-                      <TrendingUp className="h-4 w-4 text-accent" />
-                    </div>
-                  </div>
-                  <div className="h-1 w-full bg-muted rounded-full overflow-hidden mt-3">
-                    <div className="h-full bg-accent w-1/2"></div>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          </div>
         </motion.div>
 
         {/* Main Content */}
@@ -545,14 +396,6 @@ export default function Appointments() {
                   >
                     <Clock className="h-4 w-4" />
                     <span>Pending Requests</span>
-                    {stats.pending > 0 && (
-                      <Badge
-                        variant="outline"
-                        className="text-xs px-1.5 py-0.5 ml-1 border-warning/30 text-warning bg-warning/10"
-                      >
-                        {stats.pending}
-                      </Badge>
-                    )}
                   </TabsTrigger>
 
                   <TabsTrigger
@@ -587,17 +430,19 @@ export default function Appointments() {
                     <span>Rejected Appointments</span>
                   </TabsTrigger>
                 </TabsList>
-
-                <div className="flex items-center gap-2">
-                  <Badge
-                    variant="outline"
-                    className="text-xs px-2.5 py-1 border-accent/30 text-accent bg-accent/10"
-                  >
-                    Total:{" "}
-                    {pendingRequests.length + confirmedAppointments.length}
-                  </Badge>
-                </div>
               </div>
+            </div>
+
+            <div className="px-6 pt-6">
+              <AppointmentToolbar
+                activeTab={activeTab}
+                search={search}
+                setSearch={setSearch}
+                dateRange={dateRange}
+                setDateRange={setDateRange}
+                total={appointmentData?.total || 0}
+                isLoading={isAppointmentLoading}
+              />
             </div>
 
             {/* Tabs Content - Pending */}
@@ -609,44 +454,15 @@ export default function Appointments() {
                   exit={{ opacity: 0, y: -8 }}
                   className="space-y-4"
                 >
-                  {/* Search Bar */}
-                  <div className="rounded-lg border border-border/40 bg-gradient-to-r from-card to-card/90 p-4">
-                    <div className="flex items-center gap-3">
-                      <div className="relative flex-1">
-                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/60" />
-                        <Input
-                          placeholder="Search pending requests by name, email, or phone..."
-                          value={pendingSearch}
-                          onChange={(e) => setPendingSearch(e.target.value)}
-                          className="pl-9 h-10 rounded-lg border-border/40 focus:border-accent/50"
-                        />
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <div className="h-4 w-px bg-border/30" />
-                        <Badge
-                          variant="outline"
-                          className="text-xs px-2 py-1 border-accent/30 text-accent bg-accent/10"
-                        >
-                          {filteredPendingRequests.length} requests
-                        </Badge>
-                      </div>
-                    </div>
-                  </div>
-
                   {/* Table */}
-                  {isAppointmentLoading ? (
-                    <div className="flex justify-center py-12">
-                      <Loader2 className="h-8 w-8 animate-spin text-accent" />
-                    </div>
-                  ) : (
-                    <PendingRequestsTable
-                      requests={appointments}
-                      onConfirm={handleConfirm}
-                      onReject={handleReject}
-                      isConfirming={isConfirming}
-                      isRejecting={isRejecting}
-                    />
-                  )}
+                  <PendingRequestsTable
+                    requests={appointments}
+                    onConfirm={handleConfirm}
+                    onReject={handleReject}
+                    isConfirming={isConfirming}
+                    isRejecting={isRejecting}
+                    isLoading={isAppointmentLoading || isFetching}
+                  />
                 </motion.div>
               </AnimatePresence>
             </TabsContent>
@@ -660,44 +476,17 @@ export default function Appointments() {
                   exit={{ opacity: 0, y: -8 }}
                   className="space-y-4"
                 >
-                  {/* Search Bar */}
-                  <div className="rounded-lg border border-border/40 bg-gradient-to-r from-card to-card/90 p-4">
-                    <div className="flex items-center gap-3">
-                      <div className="relative flex-1">
-                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/60" />
-                        <Input
-                          placeholder="Search pending requests by name, email, or phone..."
-                          value={pendingSearch}
-                          onChange={(e) => setPendingSearch(e.target.value)}
-                          className="pl-9 h-10 rounded-lg border-border/40 focus:border-accent/50"
-                        />
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <div className="h-4 w-px bg-border/30" />
-                        <Badge
-                          variant="outline"
-                          className="text-xs px-2 py-1 border-accent/30 text-accent bg-accent/10"
-                        >
-                          {filteredPendingRequests.length} requests
-                        </Badge>
-                      </div>
-                    </div>
-                  </div>
-
                   {/* Table */}
-                  {isAppointmentLoading ? (
-                    <div className="flex justify-center py-12">
-                      <Loader2 className="h-8 w-8 animate-spin text-accent" />
-                    </div>
-                  ) : (
-                    <UpcomingAppointmentTable
-                      appointments={appointments}
-                      onReschedule={handleReschedule}
-                      onCancel={handleCancel}
-                      isRescheduling={isRescheduling}
-                      isCancelling={isCancelling}
-                    />
-                  )}
+                  <UpcomingAppointmentTable
+                    appointments={appointments}
+                    onReschedule={handleReschedule}
+                    onCancel={handleCancel}
+                    onComplete={handleComplete}
+                    isRescheduling={isRescheduling}
+                    isCancelling={isCancelling}
+                    isCompleting={isCompleting}
+                    isLoading={isAppointmentLoading || isFetching}
+                  />
                 </motion.div>
               </AnimatePresence>
             </TabsContent>
@@ -711,112 +500,12 @@ export default function Appointments() {
                   exit={{ opacity: 0, y: -8 }}
                   className="space-y-4"
                 >
-                  {/* Filter Bar */}
-                  <div className="rounded-lg border border-border/40 bg-gradient-to-r from-card to-card/90 p-4">
-                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                      <div className="flex-1">
-                        <div className="relative">
-                          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/60" />
-                          <Input
-                            placeholder="Search appointments by patient, center, or email..."
-                            value={confirmedSearch}
-                            onChange={(e) => setConfirmedSearch(e.target.value)}
-                            className="pl-9 h-10 rounded-lg border-border/40 focus:border-accent/50"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-3">
-                        <Select
-                          value={statusFilter}
-                          onValueChange={setStatusFilter}
-                        >
-                          <SelectTrigger className="w-36 h-10 rounded-lg border-border/40">
-                            <div className="flex items-center gap-2">
-                              <Filter className="h-4 w-4 text-muted-foreground/60" />
-                              <SelectValue placeholder="Status" />
-                            </div>
-                          </SelectTrigger>
-                          <SelectContent className="rounded-lg border border-border/50">
-                            <SelectItem
-                              value="all"
-                              className="text-sm rounded-lg"
-                            >
-                              All Status
-                            </SelectItem>
-                            <SelectItem
-                              value="scheduled"
-                              className="text-sm rounded-lg"
-                            >
-                              Scheduled
-                            </SelectItem>
-                            <SelectItem
-                              value="active"
-                              className="text-sm rounded-lg"
-                            >
-                              Active
-                            </SelectItem>
-                            <SelectItem
-                              value="completed"
-                              className="text-sm rounded-lg"
-                            >
-                              Completed
-                            </SelectItem>
-                            <SelectItem
-                              value="cancelled"
-                              className="text-sm rounded-lg"
-                            >
-                              Cancelled
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
-
-                        <Select
-                          value={centerFilter}
-                          onValueChange={setCenterFilter}
-                        >
-                          <SelectTrigger className="w-40 h-10 rounded-lg border-border/40">
-                            <div className="flex items-center gap-2">
-                              <Filter className="h-4 w-4 text-muted-foreground/60" />
-                              <SelectValue placeholder="Center" />
-                            </div>
-                          </SelectTrigger>
-                          <SelectContent className="rounded-lg border border-border/50">
-                            <SelectItem
-                              value="all"
-                              className="text-sm rounded-lg"
-                            >
-                              All Centers
-                            </SelectItem>
-                            {mockCenters.map((center) => (
-                              <SelectItem
-                                key={center.id}
-                                value={center.id}
-                                className="text-sm rounded-lg"
-                              >
-                                {center.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-
-                        <div className="h-4 w-px bg-border/30" />
-
-                        <Badge
-                          variant="outline"
-                          className="text-xs px-2 py-1 border-accent/30 text-accent bg-accent/10"
-                        >
-                          {filteredConfirmedAppointments.length} appointments
-                        </Badge>
-                      </div>
-                    </div>
-                  </div>
-
                   {/* Table */}
                   <CompletedAppointmentTable
                     appointments={appointments}
                     onDelete={handleDelete}
                     isDeleting={isDeleting}
+                    isLoading={isAppointmentLoading || isFetching}
                   />
                 </motion.div>
               </AnimatePresence>
@@ -831,112 +520,12 @@ export default function Appointments() {
                   exit={{ opacity: 0, y: -8 }}
                   className="space-y-4"
                 >
-                  {/* Filter Bar */}
-                  <div className="rounded-lg border border-border/40 bg-gradient-to-r from-card to-card/90 p-4">
-                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                      <div className="flex-1">
-                        <div className="relative">
-                          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/60" />
-                          <Input
-                            placeholder="Search appointments by patient, center, or email..."
-                            value={confirmedSearch}
-                            onChange={(e) => setConfirmedSearch(e.target.value)}
-                            className="pl-9 h-10 rounded-lg border-border/40 focus:border-accent/50"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-3">
-                        <Select
-                          value={statusFilter}
-                          onValueChange={setStatusFilter}
-                        >
-                          <SelectTrigger className="w-36 h-10 rounded-lg border-border/40">
-                            <div className="flex items-center gap-2">
-                              <Filter className="h-4 w-4 text-muted-foreground/60" />
-                              <SelectValue placeholder="Status" />
-                            </div>
-                          </SelectTrigger>
-                          <SelectContent className="rounded-lg border border-border/50">
-                            <SelectItem
-                              value="all"
-                              className="text-sm rounded-lg"
-                            >
-                              All Status
-                            </SelectItem>
-                            <SelectItem
-                              value="scheduled"
-                              className="text-sm rounded-lg"
-                            >
-                              Scheduled
-                            </SelectItem>
-                            <SelectItem
-                              value="active"
-                              className="text-sm rounded-lg"
-                            >
-                              Active
-                            </SelectItem>
-                            <SelectItem
-                              value="completed"
-                              className="text-sm rounded-lg"
-                            >
-                              Completed
-                            </SelectItem>
-                            <SelectItem
-                              value="cancelled"
-                              className="text-sm rounded-lg"
-                            >
-                              Cancelled
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
-
-                        <Select
-                          value={centerFilter}
-                          onValueChange={setCenterFilter}
-                        >
-                          <SelectTrigger className="w-40 h-10 rounded-lg border-border/40">
-                            <div className="flex items-center gap-2">
-                              <Filter className="h-4 w-4 text-muted-foreground/60" />
-                              <SelectValue placeholder="Center" />
-                            </div>
-                          </SelectTrigger>
-                          <SelectContent className="rounded-lg border border-border/50">
-                            <SelectItem
-                              value="all"
-                              className="text-sm rounded-lg"
-                            >
-                              All Centers
-                            </SelectItem>
-                            {mockCenters.map((center) => (
-                              <SelectItem
-                                key={center.id}
-                                value={center.id}
-                                className="text-sm rounded-lg"
-                              >
-                                {center.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-
-                        <div className="h-4 w-px bg-border/30" />
-
-                        <Badge
-                          variant="outline"
-                          className="text-xs px-2 py-1 border-accent/30 text-accent bg-accent/10"
-                        >
-                          {filteredConfirmedAppointments.length} appointments
-                        </Badge>
-                      </div>
-                    </div>
-                  </div>
-
                   {/* Table */}
                   <CancelledTable
                     appointments={appointments}
                     onDelete={handleDelete}
                     isDeleting={isDeleting}
+                    isLoading={isAppointmentLoading || isFetching}
                   />
                 </motion.div>
               </AnimatePresence>
@@ -951,112 +540,12 @@ export default function Appointments() {
                   exit={{ opacity: 0, y: -8 }}
                   className="space-y-4"
                 >
-                  {/* Filter Bar */}
-                  <div className="rounded-lg border border-border/40 bg-gradient-to-r from-card to-card/90 p-4">
-                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                      <div className="flex-1">
-                        <div className="relative">
-                          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/60" />
-                          <Input
-                            placeholder="Search appointments by patient, center, or email..."
-                            value={confirmedSearch}
-                            onChange={(e) => setConfirmedSearch(e.target.value)}
-                            className="pl-9 h-10 rounded-lg border-border/40 focus:border-accent/50"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-3">
-                        <Select
-                          value={statusFilter}
-                          onValueChange={setStatusFilter}
-                        >
-                          <SelectTrigger className="w-36 h-10 rounded-lg border-border/40">
-                            <div className="flex items-center gap-2">
-                              <Filter className="h-4 w-4 text-muted-foreground/60" />
-                              <SelectValue placeholder="Status" />
-                            </div>
-                          </SelectTrigger>
-                          <SelectContent className="rounded-lg border border-border/50">
-                            <SelectItem
-                              value="all"
-                              className="text-sm rounded-lg"
-                            >
-                              All Status
-                            </SelectItem>
-                            <SelectItem
-                              value="scheduled"
-                              className="text-sm rounded-lg"
-                            >
-                              Scheduled
-                            </SelectItem>
-                            <SelectItem
-                              value="active"
-                              className="text-sm rounded-lg"
-                            >
-                              Active
-                            </SelectItem>
-                            <SelectItem
-                              value="completed"
-                              className="text-sm rounded-lg"
-                            >
-                              Completed
-                            </SelectItem>
-                            <SelectItem
-                              value="cancelled"
-                              className="text-sm rounded-lg"
-                            >
-                              Cancelled
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
-
-                        <Select
-                          value={centerFilter}
-                          onValueChange={setCenterFilter}
-                        >
-                          <SelectTrigger className="w-40 h-10 rounded-lg border-border/40">
-                            <div className="flex items-center gap-2">
-                              <Filter className="h-4 w-4 text-muted-foreground/60" />
-                              <SelectValue placeholder="Center" />
-                            </div>
-                          </SelectTrigger>
-                          <SelectContent className="rounded-lg border border-border/50">
-                            <SelectItem
-                              value="all"
-                              className="text-sm rounded-lg"
-                            >
-                              All Centers
-                            </SelectItem>
-                            {mockCenters.map((center) => (
-                              <SelectItem
-                                key={center.id}
-                                value={center.id}
-                                className="text-sm rounded-lg"
-                              >
-                                {center.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-
-                        <div className="h-4 w-px bg-border/30" />
-
-                        <Badge
-                          variant="outline"
-                          className="text-xs px-2 py-1 border-accent/30 text-accent bg-accent/10"
-                        >
-                          {filteredConfirmedAppointments.length} appointments
-                        </Badge>
-                      </div>
-                    </div>
-                  </div>
-
                   {/* Table */}
                   <RejectedTable
                     appointments={appointments}
                     onDelete={handleDelete}
                     isDeleting={isDeleting}
+                    isLoading={isAppointmentLoading || isFetching}
                   />
                 </motion.div>
               </AnimatePresence>

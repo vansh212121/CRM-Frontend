@@ -46,7 +46,7 @@ export const centerApi = createApi({
                 { type: 'Center', id: 'LIST' },
             ],
         }),
-
+        
         // 5. GET ALL centers
         getAllCenters: builder.query({
             query: (params) => ({

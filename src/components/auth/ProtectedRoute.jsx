@@ -8,14 +8,9 @@ const ProtectedRoute = () => {
   const location = useLocation();
 
   if (isAuthenticated) {
-    // If the user is authenticated, render the child routes (e.g., Dashboard, Settings).
-    // The <Outlet /> component is a placeholder for the nested routes.
     return <Outlet />;
   }
 
-  // If the user is not authenticated, redirect them to the auth page.
-  // We pass the original location they were trying to visit in the state.
-  // This allows us to redirect them back after a successful login.
   return <Navigate to="/login" state={{ from: location }} replace />;
 };
 

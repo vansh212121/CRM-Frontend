@@ -15,8 +15,6 @@ const NotFound = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 page-transition bg-gradient-to-br from-[hsl(var(--soft-pale))] via-white to-[hsl(var(--light-neutral)/0.3)] relative overflow-hidden">
-      {/* Animated Background Elements */}
-
       {/* Floating Icons */}
       <div className="absolute top-20 left-20 animate-float">
         <Compass className="w-10 h-10 text-[hsl(var(--primary)/0.4)]" />

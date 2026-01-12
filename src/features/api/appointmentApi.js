@@ -10,30 +10,19 @@ export const appointmentApi = createApi({
         // 1. GET ALL (Paginated & Filtered)
         // ---------------------------------------------------------
         getAllAppointments: builder.query({
-            query: (params = {}) => {
-                // We handle the conversion from UI "Page" to Backend "Skip" here
-                const { page = 1, size = 10, ...filters } = params;
-                const skip = (page - 1) * size;
-
-                return {
-                    url: "/appointments/",
-                    // RTK Query automatically converts this object to ?skip=0&limit=10&order_by=...
-                    params: {
-                        skip,
-                        limit: size,
-                        ...filters, // spreads search, status, order_by, order_desc
-                    },
-                };
-            },
-            providesTags: (result) =>
+            query: (params) => ({
+                url: '/appointments',
+                params: params
+            }),
+            providesTags: (result, error, arg) =>
                 result
                     ? [
-                        // Tag individual items for granular updates
-                        ...result.items.map(({ id }) => ({ type: "Appointment", id })),
-                        // Tag the list for general refetching
-                        { type: "Appointment", id: "LIST" },
+                        // Tag each item in the list
+                        ...result.items.map(({ id }) => ({ type: 'Appointment', id: id })),
+                        // Tag the list itself
+                        { type: 'Appointment', id: 'LIST' },
                     ]
-                    : [{ type: "Appointment", id: "LIST" }],
+                    : [{ type: 'Appointment', id: 'LIST' }],
         }),
 
         // ---------------------------------------------------------

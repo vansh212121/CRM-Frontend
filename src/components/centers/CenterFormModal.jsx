@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   Building2,
-  X,
   PlusCircle,
   Save,
   MapPin,
@@ -15,7 +14,6 @@ import {
   DialogContent,
   DialogDescription,
   DialogTitle,
-  DialogClose,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -106,7 +104,8 @@ export function CenterFormModal({
     });
   };
 
-  const isValid = name && district && services && pincode &&contact &&address &&location;
+  const isValid =
+    name && district && services && pincode && contact && address && location;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -134,15 +133,6 @@ export function CenterFormModal({
                   </DialogDescription>
                 </div>
               </div>
-              <DialogClose asChild>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-8 w-8 rounded-lg hover:bg-accent/10"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </DialogClose>
             </div>
           </div>
 
@@ -180,7 +170,7 @@ export function CenterFormModal({
                           htmlFor="email"
                           className="text-xs font-medium uppercase text-muted-foreground"
                         >
-                          Email 
+                          Email
                         </Label>
                         <Input
                           id="email"

@@ -25,7 +25,6 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
-// Define outside to prevent re-creation on render
 const TIME_SLOTS = [
   "08:00",
   "08:30",
@@ -61,15 +60,20 @@ export function RescheduleModal({
   // Pre-fill data
   useEffect(() => {
     if (appointment && open) {
-      // Ensure we convert strings to Date objects if needed
-      setDate(
-        appointment.confirmedDate
-          ? new Date(appointment.confirmedDate)
-          : undefined
-      );
-      // Ensure time string matches format "HH:MM" (UI might display "10:00 AM", logic might need 24h)
-      // For now, assuming appointment.confirmedTime matches slot format or handle logic elsewhere.
-      setTime(appointment.confirmedTime?.split(" ")[0] || "");
+      const isoString =
+        appointment.appointment_date || appointment.confirmedDate;
+
+      if (isoString) {
+        const rawString = isoString
+          .replace("Z", "")
+          .replace(/\+\d{2}(:\d{2})?$/, "");
+
+        const dateObj = new Date(rawString);
+
+        setDate(dateObj);
+
+        setTime(format(dateObj, "HH:mm"));
+      }
     }
   }, [appointment, open]);
 
@@ -96,16 +100,6 @@ export function RescheduleModal({
                   <strong>{appointment?.patientName}</strong>
                 </DialogDescription>
               </div>
-              <DialogClose asChild>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  disabled={isLoading}
-                  className="h-8 w-8 rounded-lg hover:bg-accent/10"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </DialogClose>
             </div>
           </div>
 
